@@ -5,9 +5,9 @@ const { route } = require('../middleware/router');
 const { HttpError, jsonResponse } = require('../middleware/http');
 const { requiredString, integer } = require('../utils/validation');
 const { requireMembership, membership } = require('../rbac/permissions');
-const { notifyUser } = require('../notifications/events');
 const { directConversationWithAccess } = require('../services/access');
 const { createSseHub } = require('../realtime/sseHub');
+const { broadcastToUsers } = require('../realtime/userEvents');
 
 route('GET', '/api/organizations/:organizationId/direct-conversations', async ({ res, user, params }) => {
   const organizationId = integer(params.organizationId, 'organization id');
@@ -56,6 +56,17 @@ route('POST', '/api/organizations/:organizationId/direct-conversations', async (
 route('GET', '/api/direct-conversations/:conversationId/messages', async ({ res, user, params, query }) => {
   const conversationId = integer(params.conversationId, 'conversation id');
   await directConversationWithAccess(user.id, conversationId);
+  const parentMessageId = query.get('parent_message_id');
+  if (parentMessageId) {
+    // Thread view: every reply to one message, oldest first (mirrors channels.routes.js).
+    const replies = await db.all(
+      `SELECT dm.*,u.username,u.full_name FROM direct_messages dm JOIN users u ON u.id=dm.user_id
+       WHERE dm.conversation_id=? AND dm.parent_message_id=? ORDER BY dm.id`,
+      [conversationId, integer(parentMessageId, 'parent_message_id')]
+    );
+    jsonResponse(res, 200, replies);
+    return;
+  }
   const before = query.get('before');
   const paramsList = [conversationId];
   let condition = '';
@@ -88,14 +99,35 @@ route('POST', '/api/direct-conversations/:conversationId/messages', async ({ res
   const conversationId = integer(params.conversationId, 'conversation id');
   const conversation = await directConversationWithAccess(user.id, conversationId);
   const messageBody = requiredString(body.body, 'Message', 1, 4000);
-  const result = await db.run('INSERT INTO direct_messages(conversation_id,user_id,body,created_at) VALUES(?,?,?,?)', [conversationId, user.id, messageBody, db.utcnow()]);
+  let parentMessageId = null;
+  if (body.parent_message_id !== undefined && body.parent_message_id !== null && body.parent_message_id !== '') {
+    parentMessageId = integer(body.parent_message_id, 'parent_message_id');
+    const parent = await db.get('SELECT id FROM direct_messages WHERE id=? AND conversation_id=?', [parentMessageId, conversationId]);
+    if (!parent) throw new HttpError(400, 'parent_message_id must reference a message in the same conversation');
+  }
+  const result = await db.run('INSERT INTO direct_messages(conversation_id,user_id,body,parent_message_id,created_at) VALUES(?,?,?,?,?)', [conversationId, user.id, messageBody, parentMessageId, db.utcnow()]);
   await db.run('UPDATE direct_conversation_members SET last_read_at=? WHERE conversation_id=? AND user_id=?', [db.utcnow(), conversationId, user.id]);
   const created = await db.get('SELECT dm.*,u.username,u.full_name FROM direct_messages dm JOIN users u ON u.id=dm.user_id WHERE dm.id=?', [result.lastInsertRowid]);
+  // Reaches only clients with this exact conversation's stream open (existing behavior).
   dmHub.broadcast(conversationId, created);
   const otherMembers = await db.all('SELECT user_id FROM direct_conversation_members WHERE conversation_id=? AND user_id<>?', [conversationId, user.id]);
-  for (const other of otherMembers) {
-    await notifyUser(other.user_id, 'message', `New message from ${user.full_name}`, messageBody.slice(0, 180), conversation.organization_id, 'chat');
-  }
+  // Rich targeted event (Phase 3, item 11/19), NOT a row in the shared `notifications` table —
+  // messages get their own popup + unread system (src/services/messaging.js), never the general
+  // Notifications list, per explicit product requirement. Reaches the other conversation member(s)
+  // even when they don't have this conversation's own stream open.
+  broadcastToUsers(otherMembers.map(item => item.user_id), {
+    type: 'message',
+    entity: 'direct_message',
+    id: created.id,
+    organization_id: conversation.organization_id,
+    payload: {
+      conversation_type: 'dm',
+      conversation_id: conversationId,
+      sender_name: user.full_name,
+      preview: messageBody.slice(0, 180),
+      parent_message_id: parentMessageId
+    }
+  });
   jsonResponse(res, 201, created);
 });
 

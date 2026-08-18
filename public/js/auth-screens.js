@@ -5,6 +5,7 @@ import { applyTheme, setWorkspaceBusy, toast } from './ui.js';
 import { startPresenceHeartbeat, stopPresenceHeartbeat } from './presence.js';
 import { disconnectMessageStream, disconnectDmStream } from './messaging.js';
 import { loadWorkspace } from './workspace-loader.js';
+import { connectUserEventStream, disconnectUserEventStream } from './user-events.js';
 
 export function saveToken() {
   // New sessions use an HttpOnly SameSite cookie. Remove legacy localStorage tokens.
@@ -16,6 +17,7 @@ export function logout(showMessage = true) {
   stopPresenceHeartbeat();
   disconnectMessageStream();
   disconnectDmStream();
+  disconnectUserEventStream();
   const token = state.token;
   const headers = token ? { Authorization: `Bearer ${token}` } : {};
   fetch('/api/auth/logout', { method: 'POST', headers, credentials: 'same-origin' }).catch(() => {});
@@ -91,6 +93,11 @@ export async function bootstrap() {
   try {
     const me = await api('/api/auth/me');
     state.user = me.user;
+    // Open the per-user stream as soon as we know the user is authenticated — even before
+    // workspace access is confirmed below, since someone stuck on the setup screen waiting for
+    // CEO/admin approval still needs invitation_updated to arrive live (item 10's requirement).
+    // Kept open for the whole session; only closed on logout().
+    connectUserEventStream();
     state.presence = me.presence || null;
     state.settings = me.settings || state.settings || { theme: 'light' };
     state.unreadNotificationCount = Number(me.unread_notification_count || 0);

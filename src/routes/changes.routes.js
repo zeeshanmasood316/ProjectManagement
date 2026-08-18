@@ -9,6 +9,7 @@ const { FULL_ACCESS_ROLES } = require('../rbac/permissions');
 const { isManagerScope } = require('../rbac/scope');
 const { audit } = require('../notifications/events');
 const { projectWithAccess } = require('../services/access');
+const { broadcastToUsers } = require('../realtime/userEvents');
 
 route('POST', '/api/projects/:projectId/changes', async ({ res, user, params, body }) => {
   const projectId = integer(params.projectId, 'project id');
@@ -33,6 +34,10 @@ route('POST', '/api/projects/:projectId/changes', async ({ res, user, params, bo
   const createdChange = await db.get('SELECT * FROM changes WHERE id=?', [result.lastInsertRowid]);
   createdChange.ai_provider = aiResult.provider;
   createdChange.fallback_used = aiResult.fallback;
+  // Invalidation event only — the actual pending/approved tiering logic is Phase 5's, not this
+  // phase's; broadcasting the event itself at the create/approve/reject points that already exist
+  // today is all Phase 3 owns here (see plan's "what NOT to touch").
+  broadcastToUsers([project.owner_id, user.id], { type: 'change_updated', entity: 'change', id: result.lastInsertRowid, organization_id: project.organization_id, payload: { project_id: projectId, status: createdChange.status } });
   jsonResponse(res, 201, createdChange);
 });
 
@@ -52,5 +57,7 @@ route('POST', '/api/changes/:changeId/:action', async ({ res, user, params }) =>
   const { project } = await projectWithAccess(user.id, Number(change.project_id), FULL_ACCESS_ROLES);
   await db.run('UPDATE changes SET status=?,updated_at=? WHERE id=?', [action === 'approve' ? 'approved' : 'rejected', db.utcnow(), changeId]);
   await audit(project.organization_id, change.project_id, user.id, 'change', changeId, action + 'd');
-  jsonResponse(res, 200, await db.get('SELECT * FROM changes WHERE id=?', [changeId]));
+  const updatedChange = await db.get('SELECT * FROM changes WHERE id=?', [changeId]);
+  broadcastToUsers([project.owner_id, change.created_by, user.id], { type: 'change_updated', entity: 'change', id: changeId, organization_id: project.organization_id, payload: { project_id: Number(change.project_id), status: updatedChange.status } });
+  jsonResponse(res, 200, updatedChange);
 });

@@ -8,6 +8,7 @@ const { membership, FULL_ACCESS_ROLES } = require('../rbac/permissions');
 const { audit } = require('../notifications/events');
 const { projectWithAccess } = require('../services/access');
 const { getProject, createPlan, listProjectsForOrganization, PROJECT_PRIORITIES, handleCreateProject } = require('../services/projects');
+const { broadcastToUsers } = require('../realtime/userEvents');
 
 route('GET', '/api/projects', async ({ res, user, query }) => {
   const organizationId = integer(query.get('organization_id'), 'organization_id');
@@ -65,7 +66,9 @@ route('PATCH', '/api/projects/:projectId', async ({ res, user, params, body }) =
     await db.run(`UPDATE projects SET ${fields.join(',')} WHERE id=?`, values);
   }
   await audit(project.organization_id, projectId, user.id, 'project', projectId, 'updated', body);
-  jsonResponse(res, 200, await getProject(projectId));
+  const updatedProject = await getProject(projectId);
+  broadcastToUsers([project.owner_id, updatedProject.owner_id, user.id], { type: 'project_updated', entity: 'project', id: projectId, organization_id: project.organization_id, payload: {} });
+  jsonResponse(res, 200, updatedProject);
 });
 
 route('POST', '/api/projects/:projectId/generate-plan', async ({ res, user, params, body }) => {

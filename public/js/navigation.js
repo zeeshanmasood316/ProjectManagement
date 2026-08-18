@@ -3,15 +3,13 @@ import { api } from './api.js';
 import { toast, toggleMobileNavigation, renderWorkspaceError } from './ui.js';
 import { updateShell, render } from './dispatch.js';
 import { resetIntakeState } from './views/intake.js';
-import { loadWorkspace, loadProjectData } from './workspace-loader.js';
+import { loadWorkspace, loadProjectData, refreshNotifications } from './workspace-loader.js';
 
 export async function switchView(view) {
   try {
     state.view = view;
     if (state.view === 'notifications') {
-      const result = await api('/api/users/me/notifications?limit=100');
-      state.notifications = result.items || [];
-      state.unreadNotificationCount = Number(result.unread_count || 0);
+      await refreshNotifications();
       updateShell();
     }
     if (state.view === 'activity') state.activity = await api('/api/users/me/activity?limit=100');

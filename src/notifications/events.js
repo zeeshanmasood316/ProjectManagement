@@ -2,6 +2,7 @@
 
 const db = require('../database/client');
 const { cleanString } = require('../utils/validation');
+const { broadcastToUser } = require('../realtime/userEvents');
 
 async function settingsForUser(userId) {
   const existing = await db.get('SELECT * FROM user_settings WHERE user_id=?', [userId]);
@@ -21,7 +22,21 @@ async function notifyUser(userId, notificationType, title, body = '', organizati
     : notificationType === 'mention' ? 'mention_notifications'
       : notificationType === 'activity' ? 'activity_notifications' : 'workspace_notifications';
   if (!Number(settings[preference])) return null;
-  return (await db.run('INSERT INTO notifications(user_id,organization_id,notification_type,title,body,action_view,created_at) VALUES(?,?,?,?,?,?,?)', [userId, organizationId, notificationType, cleanString(title, 160), cleanString(body, 500), cleanString(actionView, 40), db.utcnow()])).lastInsertRowid;
+  const cleanTitle = cleanString(title, 160);
+  const cleanBody = cleanString(body, 500);
+  const cleanActionView = cleanString(actionView, 40);
+  const notificationId = (await db.run('INSERT INTO notifications(user_id,organization_id,notification_type,title,body,action_view,created_at) VALUES(?,?,?,?,?,?,?)', [userId, organizationId, notificationType, cleanTitle, cleanBody, cleanActionView, db.utcnow()])).lastInsertRowid;
+  // Realtime hook (Phase 3): nearly every mutation in the app already calls notifyUser(), so
+  // piggybacking the live push here gives free live notification-bell updates almost everywhere
+  // without every call site needing to know about the SSE hub.
+  broadcastToUser(userId, {
+    type: 'notification_created',
+    entity: 'notification',
+    id: notificationId,
+    organization_id: organizationId,
+    payload: { title: cleanTitle, body: cleanBody, notification_type: notificationType, action_view: cleanActionView }
+  });
+  return notificationId;
 }
 
 async function notifyOrganizationManagers(organizationId, title, body, excludeUserId = null) {

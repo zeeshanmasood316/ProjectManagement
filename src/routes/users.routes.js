@@ -8,6 +8,30 @@ const { cleanString, requiredString, integer, booleanInt, validateAvatarUrl, wor
 const { publicUser } = require('../auth/session');
 const { activity, settingsForUser } = require('../notifications/events');
 const { touchPresence, presenceForUser } = require('../services/organizations');
+const { userEventHub } = require('../realtime/userEvents');
+const { unreadMessageSummary } = require('../services/messaging');
+
+// Fifth SSE stream (see src/realtime/sseHub.js): one per signed-in user, opened once after
+// login/workspace load and kept open for the whole session (unlike the other four hubs, which are
+// scoped to whichever single channel/conversation/task the user currently has open). Carries
+// cross-cutting invalidation events (task/project/team/invitation/change updates, new
+// notifications) and message-popup events — see src/realtime/userEvents.js for the envelope shape.
+route('GET', '/api/users/me/events/stream', async ({ req, res, user }) => {
+  req.socket.setTimeout(0);
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream; charset=utf-8',
+    'Cache-Control': 'no-store',
+    'Connection': 'keep-alive',
+    'X-Accel-Buffering': 'no'
+  });
+  res.write(': connected\n\n');
+  userEventHub.add(user.id, res);
+  req.on('close', () => userEventHub.remove(user.id, res));
+});
+
+route('GET', '/api/users/me/unread-messages', async ({ res, user }) => {
+  jsonResponse(res, 200, await unreadMessageSummary(user.id));
+});
 
 route('GET', '/api/presence/me', async ({ res, user }) => {
   jsonResponse(res, 200, await presenceForUser(user.id));

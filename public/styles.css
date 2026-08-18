@@ -325,6 +325,8 @@ pre.report { white-space: pre-wrap; background: var(--ink); color: var(--page); 
 .message-meta { display: flex; align-items: baseline; gap: 8px; margin-bottom: 3px; }
 .message-meta small { color: var(--muted); }
 .message-body { white-space: pre-wrap; line-height: 1.52; }
+.message-actions { margin-top: 4px; }
+.message-actions .text-link.small { font-size: 12px; font-weight: 650; }
 .message-form { padding: 15px 20px; border-top: 1px solid var(--line); display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: end; }
 .message-form textarea { min-height: 48px; max-height: 130px; }
 
@@ -443,6 +445,16 @@ td .presence-inline + small { display: block; color: var(--muted); margin-top: 5
 #toast { position: fixed; right: 20px; bottom: 20px; padding: 12px 15px; border-radius: 10px; background: var(--ink); color: var(--page); max-width: 390px; opacity: 0; transform: translateY(12px); pointer-events: none; transition: .2s; z-index: 200; box-shadow: var(--shadow); }
 #toast.show { opacity: 1; transform: translateY(0); }
 #toast.error { background: var(--danger); }
+
+/* Message popup: visually distinct from #toast (system notifications) — top-right, brand-accented,
+   card-styled — so a new-message popup is never mistaken for a system toast (Phase 3, item 11/19). */
+.message-count { background: var(--brand); }
+#messagePopup { position: fixed; top: 20px; right: 20px; display: flex; align-items: flex-start; gap: 10px; max-width: 360px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--brand); background: var(--card, var(--page)); color: var(--ink); text-align: left; opacity: 0; transform: translateY(-10px); pointer-events: none; transition: .2s; z-index: 200; box-shadow: var(--shadow); cursor: pointer; }
+#messagePopup.show { opacity: 1; transform: translateY(0); pointer-events: auto; }
+#messagePopup .message-popup-icon { font-size: 18px; line-height: 1; }
+#messagePopup .message-popup-body { display: flex; flex-direction: column; gap: 2px; }
+#messagePopup .message-popup-body strong { color: var(--brand); font-size: 13px; }
+#messagePopup .message-popup-body span { font-size: 13px; color: var(--ink); opacity: .85; }
 
 @media (max-width: 1100px) {
   .onboarding-choice-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

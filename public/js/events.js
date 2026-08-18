@@ -4,7 +4,7 @@ import { api } from './api.js';
 import { toast, setButtonBusy, closeDialog, openAiSuggestionDialog, openGeneratePlanDialog, toggleTheme } from './ui.js';
 import { logout } from './auth-screens.js';
 import { heartbeat } from './presence.js';
-import { loadMessages, connectMessageStream, disconnectDmStream, receiveMessage, receiveDirectMessage, openConversation } from './messaging.js';
+import { loadMessages, connectMessageStream, disconnectDmStream, receiveMessage, receiveDirectMessage, openConversation, markChannelRead, refreshUnreadMessageCount, openThreadDialog } from './messaging.js';
 import { loadWorkspace, loadProjectData, downloadExport } from './workspace-loader.js';
 import { render, updateShell, viewTitles } from './dispatch.js';
 import { switchProject } from './navigation.js';
@@ -218,6 +218,9 @@ mainContent.addEventListener('click', async event => {
       localStorage.setItem('orbit_channel_id', state.channelId);
       await loadMessages();
       connectMessageStream(state.channelId);
+      await markChannelRead(state.channelId);
+      await refreshUnreadMessageCount();
+      updateShell();
       render();
     } else if (action === 'set-chat-mode') {
       state.chatMode = button.dataset.mode;
@@ -227,11 +230,21 @@ mainContent.addEventListener('click', async event => {
         if (state.activeConversationId && state.directConversations.some(item => Number(item.id) === Number(state.activeConversationId))) await openConversation(state.activeConversationId);
       } else {
         disconnectDmStream();
+        await markChannelRead(state.channelId);
       }
+      await refreshUnreadMessageCount();
+      updateShell();
       render();
     } else if (action === 'select-conversation') {
       await openConversation(Number(button.dataset.id));
+      await refreshUnreadMessageCount();
+      updateShell();
       render();
+    } else if (action === 'open-thread') {
+      const messageId = Number(button.dataset.id);
+      const isDirect = state.chatMode === 'direct';
+      const parentMessage = (isDirect ? state.directMessages : state.messages).find(item => Number(item.id) === messageId);
+      if (parentMessage) await openThreadDialog(isDirect ? 'dm' : 'channel', isDirect ? state.activeConversationId : state.channelId, parentMessage);
     } else if (action === 'open-new-dm') {
       openNewDmDialog();
     } else if (action === 'customize-dashboard') {

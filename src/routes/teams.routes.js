@@ -8,6 +8,7 @@ const { requireMembership, membership, canManageAdmins, canManageDepartment, can
 const { resolveAccessScope, scopeTeamList } = require('../rbac/scope');
 const { audit } = require('../notifications/events');
 const { teamWithAccess } = require('../services/access');
+const { broadcastToUsers } = require('../realtime/userEvents');
 
 route('GET', '/api/organizations/:organizationId/teams', async ({ res, user, params }) => {
   const organizationId = integer(params.organizationId, 'organization id');
@@ -74,7 +75,9 @@ route('PATCH', '/api/teams/:teamId', async ({ res, user, params, body }) => {
     await db.run(`UPDATE teams SET ${fields.join(',')} WHERE id=?`, values);
   }
   await audit(team.organization_id, null, user.id, 'team', teamId, 'updated', body);
-  jsonResponse(res, 200, await db.get('SELECT * FROM teams WHERE id=?', [teamId]));
+  const updatedTeam = await db.get('SELECT * FROM teams WHERE id=?', [teamId]);
+  broadcastToUsers([team.lead_user_id, updatedTeam.lead_user_id], { type: 'team_updated', entity: 'team', id: teamId, organization_id: team.organization_id, payload: {} });
+  jsonResponse(res, 200, updatedTeam);
 });
 
 route('DELETE', '/api/teams/:teamId', async ({ res, user, params }) => {
@@ -85,6 +88,7 @@ route('DELETE', '/api/teams/:teamId', async ({ res, user, params }) => {
   await db.run('UPDATE tasks SET team_id=NULL WHERE team_id=?', [teamId]);
   await db.run('DELETE FROM teams WHERE id=?', [teamId]);
   await audit(team.organization_id, null, user.id, 'team', teamId, 'deleted', {});
+  broadcastToUsers([team.lead_user_id], { type: 'team_updated', entity: 'team', id: teamId, organization_id: team.organization_id, payload: { deleted: true } });
   jsonResponse(res, 200, { removed: true });
 });
 
