@@ -1,0 +1,17 @@
+.env
+.env.*
+!.env.example
+node_modules/
+npm-debug.log*
+.DS_Store
+*.zip
+data/*.db
+data/*.db-*
+data/*.sqlite
+data/*.sqlite-*
+exports/*
+!exports/.gitkeep
+e2e/.auth/
+playwright-report/
+test-results/
+blob-report/
