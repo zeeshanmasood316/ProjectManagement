@@ -7,6 +7,14 @@ const { cleanString, requiredString, integer, normalizeDepartment } = require('.
 const { requireMembership, membership, roleCanInvite, FULL_ACCESS_ROLES, ADMIN_ROLES, isCeoRole } = require('../rbac/permissions');
 const { audit, activity, notifyUser, notifyOrganizationManagers } = require('../notifications/events');
 const { organizationMembers } = require('../services/organizations');
+const { broadcastToUsers } = require('../realtime/userEvents');
+
+// Invalidation event (Phase 3, item 10): lets the invitations/setup screen (either the invited
+// user's onboarding screen or a manager's org invitations list) update live instead of only on
+// manual refresh. Broadcast to whichever of these two users are on hand at each lifecycle point.
+function broadcastInvitationUpdated(organizationId, invitationId, status, userIds) {
+  broadcastToUsers(userIds, { type: 'invitation_updated', entity: 'invitation', id: invitationId, organization_id: organizationId, payload: { status } });
+}
 
 route('GET', '/api/invitations/me', async ({ res, user }) => {
   const items = await db.all(
@@ -36,6 +44,7 @@ route('POST', '/api/organizations/:organizationId/invitations', async ({ res, us
   const organization = await db.get('SELECT name FROM organizations WHERE id=?', [organizationId]);
   await notifyUser(invitedUser.id, 'invitation', `Invitation to ${organization.name}`, `${user.full_name} invited you as ${proposedRole} in ${proposedDepartment}.`, organizationId, 'notifications');
   await activity(user.id, 'invitation_sent', 'Invitation sent', `Invited ${invitedUser.full_name} to ${organization.name}.`, organizationId);
+  broadcastInvitationUpdated(organizationId, result.lastInsertRowid, 'invited', [invitedUser.id, user.id]);
   jsonResponse(res, 201, await db.get('SELECT * FROM invitations WHERE id=?', [result.lastInsertRowid]));
 });
 
@@ -66,6 +75,7 @@ route('POST', '/api/invitations/:invitationId/accept', async ({ res, user, param
   const organization = await db.get('SELECT name FROM organizations WHERE id=?', [invitation.organization_id]);
   await activity(user.id, 'invitation_accepted', 'Invitation accepted', `Waiting for approval to join ${organization.name}.`, invitation.organization_id);
   await notifyOrganizationManagers(invitation.organization_id, 'Invitation awaiting approval', `${user.full_name} accepted an invitation and is waiting for access approval.`, user.id);
+  broadcastInvitationUpdated(invitation.organization_id, invitationId, 'awaiting_approval', [user.id, invitation.invited_by]);
   jsonResponse(res, 200, { message: 'Invitation accepted. CEO or admin approval is still required.', status: 'awaiting_approval' });
 });
 
@@ -78,6 +88,7 @@ route('POST', '/api/invitations/:invitationId/decline', async ({ res, user, para
   await audit(invitation.organization_id, null, user.id, 'invitation', invitationId, 'declined');
   await activity(user.id, 'invitation_declined', 'Invitation declined', 'You declined an organization invitation.', invitation.organization_id);
   await notifyUser(invitation.invited_by, 'activity', 'Invitation declined', `${user.full_name} declined the invitation.`, invitation.organization_id, 'admin');
+  broadcastInvitationUpdated(invitation.organization_id, invitationId, 'declined', [user.id, invitation.invited_by]);
   jsonResponse(res, 200, { status: 'declined' });
 });
 
@@ -102,6 +113,7 @@ route('POST', '/api/invitations/:invitationId/approve', async ({ res, user, para
   await notifyUser(invitation.invited_user_id, 'invitation', `Access approved for ${approvedOrganization.name}`, `Your ${invitation.proposed_role} membership is now active.`, invitation.organization_id, 'dashboard');
   await activity(invitation.invited_user_id, 'membership_approved', 'Organization access approved', approvedOrganization.name, invitation.organization_id);
   await activity(user.id, 'membership_approved', 'Member access approved', `Approved user ${invitation.invited_user_id}.`, invitation.organization_id);
+  broadcastInvitationUpdated(invitation.organization_id, invitationId, 'approved', [invitation.invited_user_id, user.id]);
   jsonResponse(res, 200, { status: 'approved', membership: await membership(invitation.invited_user_id, invitation.organization_id, false) });
 });
 
@@ -115,6 +127,7 @@ route('POST', '/api/invitations/:invitationId/reject', async ({ res, user, param
   await audit(invitation.organization_id, null, user.id, 'invitation', invitationId, 'rejected');
   await notifyUser(invitation.invited_user_id, 'invitation', 'Organization invitation rejected', 'Your request to join was not approved.', invitation.organization_id, 'notifications');
   await activity(invitation.invited_user_id, 'membership_rejected', 'Organization access rejected', 'An organization invitation was rejected.', invitation.organization_id);
+  broadcastInvitationUpdated(invitation.organization_id, invitationId, 'rejected', [invitation.invited_user_id, user.id]);
   jsonResponse(res, 200, { status: 'rejected' });
 });
 
@@ -128,6 +141,7 @@ route('POST', '/api/invitations/:invitationId/cancel', async ({ res, user, param
   await db.run("UPDATE invitations SET status='cancelled',updated_at=? WHERE id=?", [db.utcnow(), invitationId]);
   await audit(invitation.organization_id, null, user.id, 'invitation', invitationId, 'cancelled');
   await notifyUser(invitation.invited_user_id, 'invitation', 'Invitation cancelled', 'An organization invitation was cancelled by a manager.', invitation.organization_id, 'notifications');
+  broadcastInvitationUpdated(invitation.organization_id, invitationId, 'cancelled', [invitation.invited_user_id, user.id]);
   jsonResponse(res, 200, { status: 'cancelled' });
 });
 

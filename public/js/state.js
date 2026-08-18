@@ -7,6 +7,9 @@ export const state = {
   activity: [],
   sessions: [],
   unreadNotificationCount: 0,
+  // Separate from unreadNotificationCount on purpose — messages never appear in the general
+  // Notifications list (Phase 3, item 11/19), so they get their own counter + badge.
+  unreadMessageCount: 0,
   organizations: [],
   workspaceAccess: null,
   onboardingDeferred: localStorage.getItem('orbit_onboarding_deferred') === '1',

@@ -12,6 +12,22 @@ const { activeOrganizationMembers } = require('../services/organizations');
 const { projectWithAccess, validTeamId } = require('../services/access');
 const { taskDetail, ensureBoardColumns } = require('../services/projects');
 const { canAssignTask, recordTaskAssignment, validateTaskLink, wouldCreateDependencyCycle } = require('../services/tasks');
+const { broadcastToUsers } = require('../realtime/userEvents');
+
+// Invalidation event (Phase 3): tells any client with this project/task on screen to refetch via
+// the already-RBAC-correct REST endpoints. Broadcast only to the specific user ids already on hand
+// at each call site (previous/new assignee + project owner) — see the plan's note that under-
+// broadcasting here is fine and expected (a missed push is just a stale view until the next fetch,
+// never a security issue, since the client only ever renders what its own scoped REST call returns).
+function broadcastTaskUpdated(project, task, extraUserIds = []) {
+  broadcastToUsers([project.owner_id, task.owner_id, ...extraUserIds], {
+    type: 'task_updated',
+    entity: 'task',
+    id: task.id,
+    organization_id: project.organization_id,
+    payload: { project_id: Number(task.project_id ?? project.id) }
+  });
+}
 
 route('GET', '/api/projects/:projectId/tasks', async ({ res, user, params }) => {
   const projectId = integer(params.projectId, 'project id');
@@ -83,7 +99,9 @@ route('POST', '/api/projects/:projectId/tasks', async ({ res, user, params, body
   // A task created with an owner already set is an assignment, same as PATCH-ing owner_id later —
   // the new owner must be notified either way, not just when reassigned after the fact.
   if (ownerId) await recordTaskAssignment(project, taskId, user.id, null, ownerId);
-  jsonResponse(res, 201, await taskDetail(taskId));
+  const createdTask = await taskDetail(taskId);
+  broadcastTaskUpdated(project, createdTask);
+  jsonResponse(res, 201, createdTask);
 });
 
 route('GET', '/api/tasks/:taskId', async ({ res, user, params }) => {
@@ -283,7 +301,9 @@ route('PATCH', '/api/tasks/:taskId', async ({ res, user, params, body }) => {
   }
   await audit(project.organization_id, existing.project_id, user.id, 'task', taskId, 'updated', body);
   if (ownerChanged) await recordTaskAssignment(project, taskId, user.id, existing.owner_id, newOwnerId);
-  jsonResponse(res, 200, await taskDetail(taskId));
+  const updatedTask = await taskDetail(taskId);
+  broadcastTaskUpdated(project, updatedTask, [existing.owner_id]);
+  jsonResponse(res, 200, updatedTask);
 });
 
 route('POST', '/api/tasks/bulk-assign', async ({ res, user, body }) => {
@@ -299,6 +319,7 @@ route('POST', '/api/tasks/bulk-assign', async ({ res, user, body }) => {
     if (Number(ownerId || 0) !== Number(existing.owner_id || 0)) {
       await db.run('UPDATE tasks SET owner_id=?,updated_at=? WHERE id=?', [ownerId, db.utcnow(), taskId]);
       await recordTaskAssignment(project, taskId, user.id, existing.owner_id, ownerId);
+      broadcastTaskUpdated(project, { ...existing, owner_id: ownerId }, [existing.owner_id]);
     }
     assignedTaskIds.push(taskId);
   }
@@ -315,6 +336,7 @@ route('POST', '/api/tasks/:taskId/assign-with-subtasks', async ({ res, user, par
   if (Number(ownerId || 0) !== Number(existing.owner_id || 0)) {
     await db.run('UPDATE tasks SET owner_id=?,updated_at=? WHERE id=?', [ownerId, db.utcnow(), taskId]);
     await recordTaskAssignment(project, taskId, user.id, existing.owner_id, ownerId);
+    broadcastTaskUpdated(project, { ...existing, owner_id: ownerId }, [existing.owner_id]);
   }
   const assignedSubtaskIds = [];
   if (body.include_unassigned_subtasks) {
@@ -324,6 +346,7 @@ route('POST', '/api/tasks/:taskId/assign-with-subtasks', async ({ res, user, par
       if (!await canAssignTask(subtask, member, ownerId)) continue;
       await db.run('UPDATE tasks SET owner_id=?,updated_at=? WHERE id=?', [ownerId, db.utcnow(), subtask.id]);
       await recordTaskAssignment(project, subtask.id, user.id, null, ownerId);
+      broadcastTaskUpdated(project, { ...subtask, owner_id: ownerId });
       assignedSubtaskIds.push(subtask.id);
     }
   }

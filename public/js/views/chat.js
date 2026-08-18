@@ -1,6 +1,6 @@
 import { state } from '../state.js';
 import { escapeHtml, canManage } from '../format.js';
-import { messageMarkup } from '../messaging.js';
+import { messageMarkup, topLevelMessages, replyCountFor } from '../messaging.js';
 
 export function chatModeTabs() {
   return `<div class="tabbar" role="tablist" aria-label="Messaging mode">
@@ -23,7 +23,7 @@ export function renderChat() {
     <section class="message-panel">
       ${channel ? `<header class="channel-head"><h2># ${escapeHtml(channel.name)}</h2><div class="small muted">${escapeHtml(channel.topic || 'Team discussion')} <span id="chatConnectionStatus" class="small connection-status hidden"></span></div></header>
       <div id="messageFeed" class="message-feed">
-        ${state.messages.map(messageMarkup).join('') || '<div class="empty" style="margin-top:20px">No messages yet. Start the conversation.</div>'}
+        ${topLevelMessages(state.messages).map(item => messageMarkup(item, { replyCount: replyCountFor(state.messages, item.id) })).join('') || '<div class="empty" style="margin-top:20px">No messages yet. Start the conversation.</div>'}
       </div>
       <form id="messageForm" class="message-form"><textarea name="body" required placeholder="Message #${escapeHtml(channel.name)}"></textarea><button class="primary" type="submit">Send</button></form>` : '<div class="empty">Select or create a channel.</div>'}
     </section>
@@ -42,7 +42,7 @@ export function renderDirectMessagesPanel() {
     <section class="message-panel">
       ${activeConversation ? `<header class="channel-head"><h2>${escapeHtml(activeConversation.other_user?.full_name || 'Unknown')}</h2><div class="small muted">@${escapeHtml(activeConversation.other_user?.username || '')} <span id="dmConnectionStatus" class="small connection-status hidden"></span></div></header>
       <div id="directMessageFeed" class="message-feed">
-        ${state.directMessages.map(messageMarkup).join('') || '<div class="empty" style="margin-top:20px">No messages yet. Say hello.</div>'}
+        ${topLevelMessages(state.directMessages).map(item => messageMarkup(item, { replyCount: replyCountFor(state.directMessages, item.id) })).join('') || '<div class="empty" style="margin-top:20px">No messages yet. Say hello.</div>'}
       </div>
       <form id="directMessageForm" class="message-form"><textarea name="body" required placeholder="Message ${escapeHtml(activeConversation.other_user?.full_name || '')}"></textarea><button class="primary" type="submit">Send</button></form>` : '<div class="empty">Select a conversation, or start a new one.</div>'}
     </section>

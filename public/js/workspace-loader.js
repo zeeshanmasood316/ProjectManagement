@@ -3,7 +3,7 @@ import { api } from './api.js';
 import { escapeHtml, canManage } from './format.js';
 import { setWorkspaceBusy, applyTheme, toast, renderWorkspaceError } from './ui.js';
 import { heartbeat } from './presence.js';
-import { loadMessages, loadDirectConversations, connectMessageStream, openConversation } from './messaging.js';
+import { loadMessages, loadDirectConversations, connectMessageStream, openConversation, markChannelRead, refreshUnreadMessageCount } from './messaging.js';
 import { updateShell, render } from './dispatch.js';
 import { clearWorkspaceSelection, showSetup } from './auth-screens.js';
 
@@ -55,7 +55,10 @@ export async function loadWorkspace() {
     connectMessageStream(state.channelId);
     if (state.chatMode === 'direct' && state.activeConversationId && state.directConversations.some(item => Number(item.id) === Number(state.activeConversationId))) {
       await openConversation(state.activeConversationId);
+    } else if (state.chatMode !== 'direct' && state.channelId) {
+      await markChannelRead(state.channelId);
     }
+    await refreshUnreadMessageCount();
     updateShell();
     render();
   } catch (error) {
@@ -64,6 +67,16 @@ export async function loadWorkspace() {
   } finally {
     setWorkspaceBusy(false);
   }
+}
+
+// Shared by navigation.js's manual "open the Notifications view" fetch and the live
+// notification_created SSE handler (public/js/user-events.js) — one fetch/render path, reused
+// rather than duplicated, per the Phase 3 spec's explicit "reuse the existing fetch/render
+// function rather than a full reload" instruction.
+export async function refreshNotifications() {
+  const result = await api('/api/users/me/notifications?limit=100');
+  state.notifications = result.items || [];
+  state.unreadNotificationCount = Number(result.unread_count || 0);
 }
 
 export async function loadProjectData() {

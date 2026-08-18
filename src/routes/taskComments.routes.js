@@ -9,6 +9,7 @@ const { audit, notifyUser } = require('../notifications/events');
 const { projectWithAccess } = require('../services/access');
 const { taskDetail } = require('../services/projects');
 const { createSseHub } = require('../realtime/sseHub');
+const { broadcastToUser } = require('../realtime/userEvents');
 
 const taskCommentHub = createSseHub();
 
@@ -55,7 +56,18 @@ route('POST', '/api/tasks/:taskId/comments', async ({ res, user, params, body })
     if (mentioned && Number(mentioned.id) !== Number(user.id)) await notifyUser(mentioned.id, 'mention', `${user.full_name} mentioned you`, `${task.title}: ${commentBody.slice(0, 180)}`, project.organization_id, 'work');
   }
   if (task.owner_id && Number(task.owner_id) !== Number(user.id)) {
+    // notifyUser() already pushes a 'notification_created' event over the per-user hub (see
+    // notifications/events.js). The 'comment_added' event below is a separate, lightweight
+    // invalidation event for whichever task-comment UI the recipient might have open right now —
+    // e.g. "Sarah commented on Task: Authentication" surfacing without a manual refresh.
     await notifyUser(task.owner_id, 'activity', `${user.full_name} commented on ${task.title}`, commentBody.slice(0, 180), project.organization_id, 'work');
+    broadcastToUser(task.owner_id, {
+      type: 'comment_added',
+      entity: 'task_comment',
+      id: result.lastInsertRowid,
+      organization_id: project.organization_id,
+      payload: { task_id: taskId, task_title: task.title, commenter_name: user.full_name, preview: commentBody.slice(0, 180) }
+    });
   }
   const created = await db.get('SELECT c.*,u.username,u.full_name FROM task_comments c JOIN users u ON u.id=c.user_id WHERE c.id=?', [result.lastInsertRowid]);
   taskCommentHub.broadcast(taskId, created);

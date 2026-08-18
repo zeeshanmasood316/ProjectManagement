@@ -22,6 +22,8 @@ export function updateShell() {
   presenceSelect.value = state.presence?.status_key || 'available';
   const navBadge = $('#navNotificationBadge');
   if (navBadge) { navBadge.textContent = String(state.unreadNotificationCount); navBadge.classList.toggle('hidden', !state.unreadNotificationCount); }
+  const messageBadge = $('#navMessageBadge');
+  if (messageBadge) { messageBadge.textContent = String(state.unreadMessageCount); messageBadge.classList.toggle('hidden', !state.unreadMessageCount); }
   $$('[data-manager]').forEach(button => button.classList.toggle('hidden', !canManage()));
   $$('[data-admin]').forEach(button => button.classList.toggle('hidden', !canManage()));
   $$('[data-hide-worker]').forEach(button => button.classList.toggle('hidden', isWorkerTier()));

@@ -66,6 +66,22 @@ export function toast(message, isError = false) {
   toast.timer = setTimeout(() => element.classList.remove('show'), 4500);
 }
 
+// Deliberately separate from toast() — a new-message popup (Phase 3, item 11/19) must never be
+// visually or semantically confused with a system toast, so it gets its own element/styling
+// (#messagePopup in index.html) and its own click-through behavior instead of reusing #toast.
+export function showMessagePopup(title, preview, onOpen) {
+  const element = $('#messagePopup');
+  if (!element) return;
+  $('#messagePopupTitle').textContent = title;
+  $('#messagePopupPreview').textContent = preview;
+  element.classList.remove('hidden');
+  element.classList.add('show');
+  element.onclick = () => { element.classList.remove('show'); onOpen?.(); };
+  announce(`New message: ${title}`);
+  clearTimeout(showMessagePopup.timer);
+  showMessagePopup.timer = setTimeout(() => element.classList.remove('show'), 6000);
+}
+
 export function setGlobalLoading(isLoading) {
   activeRequests = Math.max(0, activeRequests + (isLoading ? 1 : -1));
   const loading = activeRequests > 0;

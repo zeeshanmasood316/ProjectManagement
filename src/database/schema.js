@@ -129,8 +129,16 @@ const SCHEMA_SQL = `
       channel_id INTEGER NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
       user_id INTEGER NOT NULL REFERENCES users(id),
       body TEXT NOT NULL,
+      parent_message_id INTEGER REFERENCES messages(id) ON DELETE SET NULL,
       created_at TEXT NOT NULL,
       edited_at TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS channel_reads (
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      channel_id INTEGER NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
+      last_read_at TEXT NOT NULL,
+      PRIMARY KEY (user_id, channel_id)
     );
 
     CREATE TABLE IF NOT EXISTS projects (
@@ -381,6 +389,7 @@ const SCHEMA_SQL = `
       conversation_id INTEGER NOT NULL REFERENCES direct_conversations(id) ON DELETE CASCADE,
       user_id INTEGER NOT NULL REFERENCES users(id),
       body TEXT NOT NULL,
+      parent_message_id INTEGER REFERENCES direct_messages(id) ON DELETE SET NULL,
       created_at TEXT NOT NULL,
       edited_at TEXT
     );
@@ -541,6 +550,14 @@ async function initDb() {
 
   await run('CREATE INDEX IF NOT EXISTS idx_stories_team ON stories(team_id)');
   await run('CREATE INDEX IF NOT EXISTS idx_tasks_team ON tasks(team_id)');
+
+  // Phase 3 realtime: thread replies on channel/DM messages (mirrors tasks.parent_task_id).
+  const messageColumns = new Set((await all('PRAGMA table_info(messages)')).map(column => column.name));
+  if (!messageColumns.has('parent_message_id')) await run('ALTER TABLE messages ADD COLUMN parent_message_id INTEGER REFERENCES messages(id)');
+  const directMessageColumns = new Set((await all('PRAGMA table_info(direct_messages)')).map(column => column.name));
+  if (!directMessageColumns.has('parent_message_id')) await run('ALTER TABLE direct_messages ADD COLUMN parent_message_id INTEGER REFERENCES direct_messages(id)');
+  await run('CREATE INDEX IF NOT EXISTS idx_messages_parent ON messages(parent_message_id)');
+  await run('CREATE INDEX IF NOT EXISTS idx_direct_messages_parent ON direct_messages(parent_message_id)');
 }
 
 module.exports = { SCHEMA_SQL, initDb };
