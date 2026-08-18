@@ -20,7 +20,7 @@ A Slack-style organization workspace implemented entirely in **JavaScript with N
 - Local development remains zero-config: if Turso variables are absent, the app automatically uses the existing local SQLite database.
 - `/api/health/ready` reports `database_storage` as `turso` or `local-sqlite`, plus a `persistent` boolean.
 - The AI Everywhere flow remains server-side and can use Gemini without exposing the API key to the browser.
-- See **`DATABASE_SETUP_STEP_BY_STEP.md`** and **`RENDER_REDEPLOY_GUIDE.md`** for deployment.
+- See **`docs/notes/DATABASE_SETUP_STEP_BY_STEP.md`** and **`docs/notes/RENDER_REDEPLOY_GUIDE.md`** for deployment.
 
 ## Fresh-start behaviour
 
@@ -111,7 +111,7 @@ Open:
 http://127.0.0.1:8000
 ```
 
-The first page is Sign in. Select **Create ID** to register the first real user. For public deployment with persistent data, configure Turso before creating production users; see `DATABASE_SETUP_STEP_BY_STEP.md`.
+The first page is Sign in. Select **Create ID** to register the first real user. For public deployment with persistent data, configure Turso before creating production users; see `docs/notes/DATABASE_SETUP_STEP_BY_STEP.md`.
 
 ## Reset all data
 
@@ -211,18 +211,29 @@ When Turso is not configured, local SQLite is still used and `DATABASE_PATH` con
 
 ```text
 src/
-  auth.js          Password hashing, secure cookies, signed tokens, and session helpers
-  config.js        Environment configuration
-  db.js            SQLite/Turso async database adapter and full workspace schema
-  aiEngine.js      Local JavaScript planning/risk engine
-  server.js        HTTP API, authorization, notifications, and static delivery
+  server.js          Slim composition root: wires config, database, middleware, and every routes/ module
+  config.js          Environment configuration
+  database/          Schema + migrations (schema.js) and the generic SQLite/Turso driver (client.js)
+  middleware/         Router core, security headers/rate limiting, request/response helpers
+  auth/                Token/cookie/password-hash utilities and session helpers
+  rbac/                Access-scope resolution and role/permission predicates
+  realtime/            Generic SSE broadcast hub (channels, DMs, task comments, brief progress)
+  notifications/       Activity/notification/audit event recording, and SMTP mailer
+  ai/                  Local planning/risk engine (engine.js) and the LLM transport layer (provider.js)
+  routes/              One file per resource domain (auth, projects, tasks, teams, briefs, ...)
+  services/            Cross-domain helpers shared by multiple route domains
+  utils/               Shared validation and slug helpers
 public/
-  index.html       Sign-in, onboarding, and workspace shell
-  styles.css       Accessible responsive Light/Dark interface, mobile navigation, and loading/error states
-  app.js           Authentication, resilient API handling, accessibility, sessions, workspace, and project UI
+  index.html         Sign-in, onboarding, and workspace shell
+  styles.css         Accessible responsive Light/Dark interface, mobile navigation, and loading/error states
+  theme-init.js      Pre-paint theme flash prevention (loaded before the app bundle)
+  js/                Browser ES modules (state, api client, views, dialogs, AI brief UI, drag-and-drop, ...)
+                     entry point: js/main.js, wired via <script type="module">
 Dockerfile         Production container image and health check
 docker-compose.yml Local/container SQLite deployment
 scripts/
   reset.js         Rebuild a completely empty database
   seed.js          Compatibility alias for the empty reset
+docs/
+  notes/           Historical iteration/fix changelogs and deployment guides
 ```

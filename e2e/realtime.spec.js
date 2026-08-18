@@ -47,7 +47,7 @@ test('REALTIME (SSE): a direct message sent by one user appears in the other use
 // the "#dmConnectionStatus shows Reconnecting… on a dropped connection" behavior could NOT be
 // triggered or verified through a genuine network-level failure in this environment. Per instruction,
 // this is reported honestly as untestable-here rather than faked as a pass. The reconnect UI code
-// itself (source: public/app.js setDmStreamStatus/connectDmStream) does exist and is wired to the
+// itself (source: public/js/messaging.js setDmStreamStatus/connectDmStream) does exist and is wired to the
 // EventSource's onopen/onerror handlers — that much is confirmed by reading the source, not by a
 // live browser test — but the live trigger could not be reproduced with the tools available.
 test('REALTIME (SSE): switching away from and back to a conversation cleanly tears down and re-establishes the live stream (real EventSource lifecycle, not simulated)', async ({ browser }) => {

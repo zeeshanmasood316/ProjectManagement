@@ -1,6 +1,6 @@
 'use strict';
 
-const config = require('./config');
+const config = require('../config');
 
 class AiProviderError extends Error {
   constructor(message, { status = 502, provider = '', retryAfterMs = null, quotaExceeded = false } = {}) {

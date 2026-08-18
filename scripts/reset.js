@@ -15,8 +15,9 @@ async function main() {
     if (fs.existsSync(filePath)) fs.rmSync(filePath, { force: true });
   }
 
-  const db = require('../src/db');
-  await db.initDb();
+  const db = require('../src/database/client');
+  const { initDb } = require('../src/database/schema');
+  await initDb();
   console.log(`Fresh empty local database created at ${config.databasePath}`);
   await db.close();
 }

@@ -14,10 +14,11 @@ process.env.TURSO_AUTH_TOKEN = '';
 process.env.GEMINI_API_KEY = '';
 process.env.AI_PROVIDER_API_KEY = '';
 
-const db = require('../src/db');
+const db = require('../src/database/client');
+const { initDb } = require('../src/database/schema');
 const { createServer } = require('../src/server');
 
-db.initDb();
+initDb();
 const server = createServer();
 
 let baseUrl;

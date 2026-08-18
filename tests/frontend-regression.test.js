@@ -5,7 +5,21 @@ const path = require('node:path');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const appSource = fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8');
+function collectJsFiles(dir) {
+  return fs.readdirSync(dir, { withFileTypes: true })
+    .flatMap(entry => entry.isDirectory()
+      ? collectJsFiles(path.join(dir, entry.name))
+      : entry.name.endsWith('.js') ? [path.join(dir, entry.name)] : []);
+}
+
+function readAllJs(dir) {
+  return collectJsFiles(dir)
+    .sort()
+    .map(f => fs.readFileSync(f, 'utf8'))
+    .join('\n');
+}
+
+const appSource = readAllJs(path.join(__dirname, '..', 'public', 'js'));
 const htmlSource = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8');
 
 test('async form handlers keep a stable form reference', () => {

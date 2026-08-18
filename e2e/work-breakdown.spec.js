@@ -16,7 +16,8 @@ test.beforeEach(async ({ page }) => {
   await page.locator('[data-view="work"]').click();
   // Other spec files in this run create additional projects against the same shared test database;
   // the app defaults to whichever project was updated most recently when none is explicitly chosen
-  // (public/app.js:656), so this must pin the exact seeded project rather than rely on that default.
+  // (public/js/workspace-loader.js, loadWorkspace), so this must pin the exact seeded project rather
+  // than rely on that default.
   await page.locator('#projectSelect').selectOption(String(seed.projectId));
   await page.locator('[data-action="set-project-tab"][data-tab="board"]').click();
   await expect(page.locator('.kanban-board')).toBeVisible();
@@ -28,7 +29,7 @@ test('drag-and-drop: moving a task card to another column updates its status/col
   await expect(card).toBeVisible();
 
   // locator.dragTo()'s single-step mouse move is occasionally too fast for this app's dragover
-  // handler (public/app.js:4001) to register the current drop target before drop fires — a known
+  // handler (public/js/dnd.js) to register the current drop target before drop fires — a known
   // Playwright caveat with native HTML5 DnD, observed here as intermittent flakiness across repeated
   // runs. Driving the mouse through explicit down/move/move/up steps is the standard, reliable fix.
   const sourceBox = await card.boundingBox();

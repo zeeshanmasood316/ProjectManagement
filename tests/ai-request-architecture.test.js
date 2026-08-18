@@ -8,7 +8,7 @@ process.env.GEMINI_API_KEY = 'test-key';
 process.env.AI_MODEL = 'gemini-test-model';
 process.env.AI_MAX_RETRIES = '2';
 
-const ai = require('../src/aiEngine');
+const ai = require('../src/ai/engine');
 
 function geminiResponse(jsonBody) {
   return new Response(JSON.stringify({ candidates: [{ content: { role: 'model', parts: [{ text: JSON.stringify(jsonBody) }] } }] }), { status: 200, headers: { 'content-type': 'application/json' } });

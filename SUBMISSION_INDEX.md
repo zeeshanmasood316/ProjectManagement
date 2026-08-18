@@ -1,11 +1,14 @@
 # Submission Index
 
 - `README.md` — setup, fresh-start behaviour, features, security, and deployment
-- `src/server.js` — JavaScript API, authorization, rate limits, headers, health checks, and graceful shutdown
-- `src/db.js` — shared SQLite/Turso schema, migrations, transactions, and full-workspace persistence helpers
-- `src/auth.js` — password hashing, secure cookies, signed tokens, and session parsing
-- `src/aiEngine.js` — JavaScript AI-support logic
-- `public/` — complete responsive and accessible browser interface
+- `src/server.js` — slim composition root wiring config, database, middleware, and all `src/routes/` modules
+- `src/routes/`, `src/services/` — REST API handlers and cross-domain helpers, grouped by resource domain
+- `src/database/` — shared SQLite/Turso schema, migrations, and the generic data-access driver
+- `src/auth/`, `src/rbac/` — password hashing, signed tokens, session parsing, and role/permission checks
+- `src/realtime/` — shared SSE broadcast hub for channels, direct messages, task comments, and brief progress
+- `src/notifications/` — activity/notification/audit event recording and SMTP mailer
+- `src/ai/` — JavaScript AI-support logic (local engine + LLM provider transport)
+- `public/` — complete responsive and accessible browser interface (ES modules under `public/js/`)
 - `tests/workspace.test.js` — organization/project acceptance coverage
 - `tests/iteration4.test.js` — security, cookie-session, request-validation, and health coverage
 - `tests/frontend-regression.test.js` — onboarding and UI regression coverage
@@ -14,6 +17,6 @@
 - `docs/USER_GUIDE.md` — operating instructions
 - `docs/REQUIREMENTS_TRACEABILITY.md` — requirement mapping
 - `docs/PRIVACY_AND_LIMITATIONS.md` — security boundaries and production limitations
-- `ITERATION_2_NOTES.md` — organization/member implementation details
-- `ITERATION_3_NOTES.md` — profile, notification, activity, theme, and status details
-- `ITERATION_4_NOTES.md` — production-quality polish and deployment details
+- `docs/notes/ITERATION_2_NOTES.md` — organization/member implementation details
+- `docs/notes/ITERATION_3_NOTES.md` — profile, notification, activity, theme, and status details
+- `docs/notes/ITERATION_4_NOTES.md` — production-quality polish and deployment details

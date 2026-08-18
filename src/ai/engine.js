@@ -1,8 +1,8 @@
 'use strict';
 
 const crypto = require('node:crypto');
-const config = require('./config');
-const provider = require('./aiProvider');
+const config = require('../config');
+const provider = require('./provider');
 
 function clean(value) {
   return String(value || '').trim();

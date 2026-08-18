@@ -1,6 +1,6 @@
 'use strict';
 
-const config = require('./config');
+const config = require('../config');
 
 function configured() {
   return Boolean(config.smtp.host && config.smtp.user && config.smtp.pass && config.smtp.from);

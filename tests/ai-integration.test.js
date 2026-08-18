@@ -7,7 +7,7 @@ process.env.AI_PROVIDER = 'gemini';
 process.env.GEMINI_API_KEY = 'test-key';
 process.env.AI_MODEL = 'gemini-3-flash-preview';
 
-const provider = require('../src/aiProvider');
+const provider = require('../src/ai/provider');
 
 test('Gemini structured response is parsed through the server-side AI provider', async () => {
   const originalFetch = global.fetch;

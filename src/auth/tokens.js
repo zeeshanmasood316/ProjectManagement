@@ -1,7 +1,7 @@
 'use strict';
 
 const crypto = require('node:crypto');
-const config = require('./config');
+const config = require('../config');
 
 const COOKIE_NAME = 'orbit_session';
 
