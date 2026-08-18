@@ -247,11 +247,10 @@ test('WORK BREAKDOWN: task and subtask create/edit/status-update persist across 
   assert.equal(subtask.status, 201);
   assert.equal(Number(subtask.data.parent_task_id), taskId);
 
-  const statusUpdate = await request(`/api/tasks/${subtask.data.id}`, { method: 'PATCH', token: ceo.token, body: { status: 'in_progress', progress: 50 } });
+  const statusUpdate = await request(`/api/tasks/${subtask.data.id}`, { method: 'PATCH', token: ceo.token, body: { status: 'in_progress' } });
   assert.equal(statusUpdate.status, 200);
   const subtaskAfter = await request(`/api/tasks/${subtask.data.id}`, { token: ceo.token });
   assert.equal(subtaskAfter.data.status, 'in_progress');
-  assert.equal(Number(subtaskAfter.data.progress), 50);
 
   const listAfter = await request(`/api/projects/${projectId}/tasks`, { token: ceo.token });
   const subtaskInList = listAfter.data.find(t => t.id === subtask.data.id);

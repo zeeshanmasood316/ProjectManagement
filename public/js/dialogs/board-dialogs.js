@@ -16,7 +16,7 @@ export function openMilestoneDialog(milestoneId = null) {
     <label class="full">Name<input name="name" autofocus required value="${escapeHtml(milestone?.name || '')}"></label>
     <label class="full">Description<textarea name="description">${escapeHtml(milestone?.description || '')}</textarea></label>
     <label>Due date<input name="due_date" type="date" value="${escapeHtml(milestone?.due_date || '')}"></label>
-    <label>Owner<select name="owner_id">${ownerOptions}</select></label>
+    <label>Assigned To<select name="owner_id">${ownerOptions}</select></label>
     <label>Status<select name="status">${['planned', 'in_progress', 'at_risk', 'done'].map(value => `<option value="${value}" ${milestone?.status === value ? 'selected' : ''}>${value.replaceAll('_', ' ')}</option>`).join('')}</select></label>
     <div class="full actions">${milestone ? `<button type="button" class="icon-action danger" data-action="delete-milestone" aria-label="Delete milestone" data-tooltip="Delete milestone">${ICONS.trash}</button>` : ''}<button class="primary" type="submit">${milestone ? 'Save changes' : 'Create milestone'}</button></div>
   </form>`;

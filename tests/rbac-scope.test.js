@@ -163,8 +163,8 @@ test('RBAC: CEO sees everything, a team Manager is scoped to their own team, a W
   const wkrTaskDirect = await request(`/api/tasks/${taskA2.data.id}`, { token: worker1.token });
   assert.equal(wkrTaskDirect.status, 403, 'Worker must not read another worker\'s task by direct id');
 
-  const wkrStatusUpdate = await request(`/api/tasks/${taskA1.data.id}`, { method: 'PATCH', token: worker1.token, body: { status: 'in_progress', progress: 40 } });
-  assert.equal(wkrStatusUpdate.status, 200, 'Worker can update status/progress on their own task');
+  const wkrStatusUpdate = await request(`/api/tasks/${taskA1.data.id}`, { method: 'PATCH', token: worker1.token, body: { status: 'in_progress' } });
+  assert.equal(wkrStatusUpdate.status, 200, 'Worker can update status on their own task');
 
   const wkrStructuralEdit = await request(`/api/tasks/${taskA1.data.id}`, { method: 'PATCH', token: worker1.token, body: { title: 'Renamed by worker' } });
   assert.equal(wkrStructuralEdit.status, 403, 'Worker must not edit structural fields, even on their own task');

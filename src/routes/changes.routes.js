@@ -20,7 +20,7 @@ route('POST', '/api/projects/:projectId/changes', async ({ res, user, params, bo
     `SELECT u.full_name name,COUNT(*) count FROM tasks t JOIN users u ON u.id=t.owner_id
      WHERE t.project_id=? AND t.status!='done' AND t.rejected=0 GROUP BY u.id,u.full_name`, [projectId]
   )).map(row => [row.name, Number(row.count)]));
-  const existingTasks = await db.all('SELECT id,phase,title,owner_id,priority,status,progress,due_date FROM tasks WHERE project_id=? AND rejected=0 ORDER BY id', [projectId]);
+  const existingTasks = await db.all('SELECT id,phase,title,owner_id,priority,status,due_date FROM tasks WHERE project_id=? AND rejected=0 ORDER BY id', [projectId]);
   const aiResult = await ai.analyzeChangeWithAi(description, taskCount, ownerCounts, project, existingTasks);
   const impact = aiResult.item;
   const now = db.utcnow();

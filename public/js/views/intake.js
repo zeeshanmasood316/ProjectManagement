@@ -68,7 +68,7 @@ export function renderIntakeDetailsStep() {
     <label>Objective<input name="objective" value="${escapeHtml(fields.objective || '')}"></label>
     <label class="full">Scope<textarea name="scope">${escapeHtml(fields.scope || '')}</textarea></label>
     <label>Constraints<textarea name="constraints">${escapeHtml(fields.constraints || '')}</textarea></label>
-    <label>Owner<select name="owner_id">${ownerOptions}</select></label>
+    <label>Assigned To<select name="owner_id">${ownerOptions}</select></label>
     <label>Priority<select name="priority">${['low', 'medium', 'high', 'critical'].map(value => `<option value="${value}" ${(fields.priority || 'medium') === value ? 'selected' : ''}>${value}</option>`).join('')}</select></label>
     <label>Start date<input name="start_date" type="date" value="${escapeHtml(fields.start_date || '')}"></label>
     <label>Due date<input name="due_date" type="date" value="${escapeHtml(fields.due_date || '')}"></label>

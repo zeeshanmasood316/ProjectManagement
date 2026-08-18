@@ -83,7 +83,6 @@ function proposePlan(project, members, brief = '') {
     owner_id: ownerId,
     priority,
     status: 'not_started',
-    progress: 0,
     acceptance_criteria: acceptanceCriteria,
     due_date: null,
     depends_on_proposal_indexes: depends
@@ -168,8 +167,6 @@ function scanRisks(tasks, members, dependencies) {
     }
     if (!task.owner_id && task.status !== 'done') results.push(risk('ownership', 'medium', `Unowned task: ${task.title}`, 'The task has no responsible owner.', `Task #${task.id} owner_id is empty.`));
     if (task.status === 'blocked') results.push(risk('blocker', 'high', `Blocked task: ${task.title}`, 'The stored task state is blocked.', `Task #${task.id} status=blocked.`));
-    if (task.status === 'done' && Number(task.progress) < 100) results.push(risk('conflict', 'high', `Contradictory task record: ${task.title}`, 'A completed task has progress below 100%.', `Task #${task.id} status=done but progress=${task.progress}%.`));
-    if (task.status === 'not_started' && Number(task.progress) > 0) results.push(risk('conflict', 'medium', `Contradictory task record: ${task.title}`, 'A not-started task has recorded progress.', `Task #${task.id} status=not_started but progress=${task.progress}%.`));
     if (['high', 'critical'].includes(task.priority) && !clean(task.acceptance_criteria)) results.push(risk('requirement', 'medium', `Missing completion criteria: ${task.title}`, 'A high-priority task lacks acceptance criteria.', `Task #${task.id} acceptance_criteria is empty.`));
     if (task.due_date && task.status !== 'done' && /^\d{4}-\d{2}-\d{2}$/.test(task.due_date) && task.due_date < today) results.push(risk('schedule', 'high', `Overdue task: ${task.title}`, 'The task due date has passed and it is not complete.', `Task #${task.id} due_date=${task.due_date}, status=${task.status}.`));
   }
@@ -266,7 +263,6 @@ async function generatePlan(project, members, brief = '') {
       owner_id: allowedOwners.has(Number(task.owner_id)) ? Number(task.owner_id) : null,
       priority: ['low', 'medium', 'high', 'critical'].includes(task.priority) ? task.priority : 'medium',
       status: 'not_started',
-      progress: 0,
       acceptance_criteria: clean(task.acceptance_criteria).slice(0, 10000),
       due_date: /^\d{4}-\d{2}-\d{2}$/.test(clean(task.due_date)) ? clean(task.due_date) : null,
       depends_on_proposal_indexes: [...new Set((Array.isArray(task.depends_on_proposal_indexes) ? task.depends_on_proposal_indexes : [])
@@ -840,7 +836,7 @@ async function scanRisksWithAi(tasks, members, dependencies, project = null) {
   try {
     const result = await provider.generateJson({
       system: 'You are a cautious project risk analyst. Identify only risks supported by stored data. Evidence must reference concrete task IDs, statuses, due dates, ownership, dependencies, or explicit project constraints. Do not invent market, security, staffing, or schedule facts.',
-      prompt: `Project: ${JSON.stringify(project || {})}\nMembers: ${JSON.stringify(memberSummary(members))}\nTasks: ${JSON.stringify((tasks || []).slice(0,120).map(t => ({id:t.id,phase:t.phase,title:t.title,owner_id:t.owner_id,priority:t.priority,status:t.status,progress:t.progress,acceptance_criteria:t.acceptance_criteria,due_date:t.due_date})))}\nDependencies: ${JSON.stringify((dependencies || []).slice(0,240))}\n\nReturn the most material evidence-backed risks only.`,
+      prompt: `Project: ${JSON.stringify(project || {})}\nMembers: ${JSON.stringify(memberSummary(members))}\nTasks: ${JSON.stringify((tasks || []).slice(0,120).map(t => ({id:t.id,phase:t.phase,title:t.title,owner_id:t.owner_id,priority:t.priority,status:t.status,acceptance_criteria:t.acceptance_criteria,due_date:t.due_date})))}\nDependencies: ${JSON.stringify((dependencies || []).slice(0,240))}\n\nReturn the most material evidence-backed risks only.`,
       schema: riskSchema,
       reason: 'scan_risks',
       context: `project:${project?.id ?? 'unknown'}`

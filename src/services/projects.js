@@ -81,9 +81,9 @@ async function createPlan(projectId, actorUserId, brief = '', replaceUnapproved 
     const ids = [];
     for (const proposal of proposals) {
       const inserted = await db.run(
-        `INSERT INTO tasks(project_id,phase,title,description,owner_id,priority,status,progress,acceptance_criteria,due_date,source_type,ai_generated,approved,rejected,created_by,created_at,updated_at)
-         VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-        [projectId, proposal.phase, proposal.title, proposal.description, proposal.owner_id, proposal.priority, proposal.status, proposal.progress, proposal.acceptance_criteria, proposal.due_date, 'ai_plan', 1, 0, 0, actorUserId, db.utcnow(), db.utcnow()]
+        `INSERT INTO tasks(project_id,phase,title,description,owner_id,priority,status,acceptance_criteria,due_date,source_type,ai_generated,approved,rejected,created_by,created_at,updated_at)
+         VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        [projectId, proposal.phase, proposal.title, proposal.description, proposal.owner_id, proposal.priority, proposal.status, proposal.acceptance_criteria, proposal.due_date, 'ai_plan', 1, 0, 0, actorUserId, db.utcnow(), db.utcnow()]
       );
       ids.push(inserted.lastInsertRowid);
     }
@@ -111,7 +111,7 @@ async function projectReport(projectId) {
   const blockers = tasks.filter(task => task.status === 'blocked');
   const approvedTasks = tasks.filter(task => Number(task.approved) === 1);
   const complete = approvedTasks.filter(task => task.status === 'done');
-  const overall = approvedTasks.length ? Math.round(approvedTasks.reduce((sum, task) => sum + Number(task.progress), 0) / approvedTasks.length) : 0;
+  const overall = approvedTasks.length ? Math.round((complete.length / approvedTasks.length) * 100) : 0;
   return {
     generated_at: db.utcnow(),
     project: { id: project.id, name: project.name, objective: project.objective, scope: project.scope, status: project.status },

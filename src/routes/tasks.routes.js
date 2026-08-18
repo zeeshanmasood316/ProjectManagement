@@ -46,7 +46,6 @@ route('POST', '/api/projects/:projectId/tasks', async ({ res, user, params, body
   if (ownerId && !await membership(ownerId, project.organization_id, true)) throw new HttpError(400, 'Task owner must be an active organization member');
   const priority = ['low', 'medium', 'high', 'critical'].includes(body.priority) ? body.priority : 'medium';
   let status = ['not_started', 'in_progress', 'blocked', 'done'].includes(body.status) ? body.status : 'not_started';
-  const progress = Math.min(100, Math.max(0, Number(body.progress || 0)));
   const columnId = body.column_id ? integer(body.column_id, 'column_id') : null;
   let boardPosition = 0;
   if (columnId) {
@@ -58,9 +57,9 @@ route('POST', '/api/projects/:projectId/tasks', async ({ res, user, params, body
   }
   const now = db.utcnow();
   const result = await db.run(
-    `INSERT INTO tasks(project_id,phase,title,description,owner_id,priority,status,progress,acceptance_criteria,due_date,start_date,source_type,ai_generated,approved,rejected,created_by,created_at,updated_at,column_id,board_position)
-     VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-    [projectId, cleanString(body.phase, 120) || 'General', title, cleanString(body.description), ownerId, priority, status, progress, cleanString(body.acceptance_criteria), cleanString(body.due_date, 10) || null, cleanString(body.start_date, 10) || null, 'manual', 0, 1, 0, user.id, now, now, columnId, boardPosition]
+    `INSERT INTO tasks(project_id,phase,title,description,owner_id,priority,status,acceptance_criteria,due_date,start_date,source_type,ai_generated,approved,rejected,created_by,created_at,updated_at,column_id,board_position)
+     VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    [projectId, cleanString(body.phase, 120) || 'General', title, cleanString(body.description), ownerId, priority, status, cleanString(body.acceptance_criteria), cleanString(body.due_date, 10) || null, cleanString(body.start_date, 10) || null, 'manual', 0, 1, 0, user.id, now, now, columnId, boardPosition]
   );
   const taskId = result.lastInsertRowid;
   const parentTaskId = await validateTaskLink(projectId, taskId, body.parent_task_id, 'parent_task_id');
@@ -181,9 +180,9 @@ route('DELETE', '/api/board-columns/:columnId', async ({ res, user, params, body
   jsonResponse(res, 200, { ok: true, moved_task_count: taskCount });
 });
 
-// Fields a plain Worker may change on a task they own but do not manage — status/progress
+// Fields a plain Worker may change on a task they own but do not manage — status
 // updates and moving their own card between board columns (which just maps to a status change).
-const WORKER_SELF_EDIT_FIELDS = new Set(['status', 'progress', 'column_id', 'board_position']);
+const WORKER_SELF_EDIT_FIELDS = new Set(['status', 'column_id', 'board_position']);
 
 route('PATCH', '/api/tasks/:taskId', async ({ res, user, params, body }) => {
   const taskId = integer(params.taskId, 'task id');
@@ -199,12 +198,12 @@ route('PATCH', '/api/tasks/:taskId', async ({ res, user, params, body }) => {
     if (!await canAssignTask(existing, member, newOwnerId)) throw new HttpError(403, 'You do not have permission to assign this task.');
     ownerChanged = Number(newOwnerId || 0) !== Number(existing.owner_id || 0);
   }
-  // A Worker who owns this task but doesn't manage its team may only move status/progress —
+  // A Worker who owns this task but doesn't manage its team may only move its status —
   // every other field (title, description, priority, dates, links, etc.) requires managing the
   // task's team or full-access. (owner_id/approved/rejected are already gated above/below.)
   if (!taskManagedByScope(scope, existing)) {
     const restrictedFields = Object.keys(body).filter(key => !['owner_id', 'approved', 'rejected'].includes(key) && !WORKER_SELF_EDIT_FIELDS.has(key));
-    if (restrictedFields.length) throw new HttpError(403, `You can only update status and progress on your own tasks (not: ${restrictedFields.join(', ')})`);
+    if (restrictedFields.length) throw new HttpError(403, `You can only update status on your own tasks (not: ${restrictedFields.join(', ')})`);
   }
   const allowed = {
     phase: value => cleanString(value, 120) || 'General',
@@ -213,7 +212,6 @@ route('PATCH', '/api/tasks/:taskId', async ({ res, user, params, body }) => {
     owner_id: value => value ? integer(value, 'owner_id') : null,
     priority: value => { if (!['low', 'medium', 'high', 'critical'].includes(value)) throw new HttpError(400, 'Invalid priority'); return value; },
     status: value => { if (!['not_started', 'in_progress', 'blocked', 'done'].includes(value)) throw new HttpError(400, 'Invalid status'); return value; },
-    progress: value => { const output = Number(value); if (!Number.isFinite(output) || output < 0 || output > 100) throw new HttpError(400, 'Progress must be between 0 and 100'); return Math.round(output); },
     acceptance_criteria: value => cleanString(value),
     due_date: value => cleanString(value, 10) || null,
     start_date: value => cleanString(value, 10) || null,

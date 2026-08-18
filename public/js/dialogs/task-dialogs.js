@@ -99,7 +99,7 @@ export async function openTaskDialog(taskId = null, presetColumnId = null) {
     <label>Phase<input name="phase" autofocus value="${escapeHtml(task?.phase || 'General')}"></label>
     <label>Title<input name="title" required value="${escapeHtml(task?.title || '')}"></label>
     <label class="full">Description<textarea name="description">${escapeHtml(task?.description || '')}</textarea></label>
-    <label>Owner<select name="owner_id">${ownerOptions}</select></label>
+    <label>Assigned To<select name="owner_id">${ownerOptions}</select></label>
     ${teamField}
     ${task?.team_name ? `<div class="small muted full">Manager: ${escapeHtml(task.team_manager_name || 'Not assigned')}</div>` : ''}
     <label>Priority<select name="priority">${['low', 'medium', 'high', 'critical'].map(value => `<option value="${value}" ${task?.priority === value ? 'selected' : ''}>${value}</option>`).join('')}</select></label>
@@ -205,7 +205,7 @@ export function openStoryDialog(storyId = null) {
   overlay.innerHTML = `<form id="storyForm" class="dialog-card form-grid"><div class="dialog-head full"><h2 id="storyDialogTitle">${story ? 'Edit story' : 'Add story'}</h2><button type="button" class="icon-button" data-action="close-dialog" aria-label="Close" data-tooltip="Close">${ICONS.x}</button></div>
     <label class="full">Name<input name="name" autofocus required value="${escapeHtml(story?.name || '')}"></label>
     <label class="full">Description<textarea name="description">${escapeHtml(story?.description || '')}</textarea></label>
-    <label>Owner<select name="owner_id">${ownerOptions}</select></label>
+    <label>Assigned To<select name="owner_id">${ownerOptions}</select></label>
     <label>Department<select name="department_id">${departmentOptions}</select></label>
     <label>Priority<select name="priority">${['low', 'medium', 'high', 'critical'].map(value => `<option value="${value}" ${(story?.priority || 'medium') === value ? 'selected' : ''}>${value}</option>`).join('')}</select></label>
     <label>Status<select name="status">${['not_started', 'in_progress', 'at_risk', 'done'].map(value => `<option value="${value}" ${story?.status === value ? 'selected' : ''}>${value.replaceAll('_', ' ')}</option>`).join('')}</select></label>

@@ -103,7 +103,6 @@ export function filteredSortedTasks() {
   const sorters = {
     due_date: (a, b) => (a.due_date || '9999-99-99').localeCompare(b.due_date || '9999-99-99'),
     priority: (a, b) => priorityRank[a.priority] - priorityRank[b.priority],
-    progress: (a, b) => b.progress - a.progress,
     title: (a, b) => a.title.localeCompare(b.title),
     phase: (a, b) => a.phase.localeCompare(b.phase) || a.id - b.id
   };
@@ -124,7 +123,7 @@ export function groupOrderedTasksByStory(ordered) {
 }
 
 export function taskRowMarkup(task, depth) {
-  return `<tr class="${depth ? 'subtask-row' : ''}"><td style="padding-left:${12 + depth * 20}px">${depth ? '↳ ' : ''}<strong>${escapeHtml(task.title)}</strong><br><span class="small muted">${escapeHtml(task.phase)}${task.dependencies?.length ? ` · blocked by ${task.dependencies.length}` : ''}</span></td><td>${personNameWithStatus(task.owner_id, task.owner_name || 'Unassigned')}</td><td>${badge(task.priority)}</td><td>${badge(task.status)}</td><td>${task.progress}%</td><td>${escapeHtml(task.due_date || '—')}</td><td>${task.approved ? badge('approved') : badge('pending')}</td><td><div class="actions"><button class="icon-action" type="button" data-action="open-task" data-id="${task.id}" aria-label="Edit task" data-tooltip="Edit task">${ICONS.pencil}</button>${canManage() && !task.approved ? `<button class="primary" data-action="approve-task" data-id="${task.id}">Approve</button>` : ''}${canManage() ? `<button class="secondary" data-action="regenerate-task" data-id="${task.id}">Regenerate</button><button class="danger" data-action="reject-task" data-id="${task.id}">Reject</button>` : ''}</div></td></tr>`;
+  return `<tr class="${depth ? 'subtask-row' : ''}"><td style="padding-left:${12 + depth * 20}px">${depth ? '↳ ' : ''}<strong>${escapeHtml(task.title)}</strong><br><span class="small muted">${escapeHtml(task.phase)}${task.dependencies?.length ? ` · blocked by ${task.dependencies.length}` : ''}</span></td><td>${personNameWithStatus(task.owner_id, task.owner_name || 'Unassigned')}</td><td>${badge(task.priority)}</td><td>${badge(task.status)}</td><td>${escapeHtml(task.due_date || '—')}</td><td>${task.approved ? badge('approved') : badge('pending')}</td><td><div class="actions"><button class="icon-action" type="button" data-action="open-task" data-id="${task.id}" aria-label="Edit task" data-tooltip="Edit task">${ICONS.pencil}</button>${canManage() && !task.approved ? `<button class="primary" data-action="approve-task" data-id="${task.id}">Approve</button>` : ''}${canManage() ? `<button class="secondary" data-action="regenerate-task" data-id="${task.id}">Regenerate</button><button class="danger" data-action="reject-task" data-id="${task.id}">Reject</button>` : ''}</div></td></tr>`;
 }
 
 export function renderTaskList() {
@@ -138,7 +137,7 @@ export function renderTaskList() {
     <select data-task-filter="priority"><option value="all">All priorities</option>${['low', 'medium', 'high', 'critical'].map(value => `<option value="${value}" ${filters.priority === value ? 'selected' : ''}>${value}</option>`).join('')}</select>
     <select data-task-filter="assignee"><option value="all">All assignees</option>${state.members.filter(member => member.status === 'active').map(member => `<option value="${member.user_id}" ${filters.assignee === String(member.user_id) ? 'selected' : ''}>${escapeHtml(member.full_name)}</option>`).join('')}</select>
     <select data-task-filter="phase"><option value="all">All phases</option>${phases.map(phase => `<option value="${escapeHtml(phase)}" ${filters.phase === phase ? 'selected' : ''}>${escapeHtml(phase)}</option>`).join('')}</select>
-    <select id="taskSortSelect">${[['phase', 'Sort: Phase'], ['due_date', 'Sort: Due date'], ['priority', 'Sort: Priority'], ['progress', 'Sort: Progress'], ['title', 'Sort: Title']].map(([value, label]) => `<option value="${value}" ${state.taskSort === value ? 'selected' : ''}>${label}</option>`).join('')}</select>
+    <select id="taskSortSelect">${[['phase', 'Sort: Phase'], ['due_date', 'Sort: Due date'], ['priority', 'Sort: Priority'], ['title', 'Sort: Title']].map(([value, label]) => `<option value="${value}" ${state.taskSort === value ? 'selected' : ''}>${label}</option>`).join('')}</select>
     ${canManage() ? '<button class="secondary" type="button" data-action="open-story">+ Add Story</button>' : ''}
   </div>`;
   if (!storyGroups.length) return `${filterBar}<div class="card empty">No tasks match these filters.</div>`;
@@ -148,7 +147,7 @@ export function renderTaskList() {
     const heading = story
       ? `<div class="story-group-head"><h3>${escapeHtml(story.name)}</h3>${badge(story.status)}<span class="small muted">${done}/${total} done</span><button class="text-link" type="button" data-action="open-story" data-id="${story.id}">Edit story</button></div>`
       : `<div class="story-group-head"><h3>No story</h3><span class="small muted">${total} task${total === 1 ? '' : 's'}</span></div>`;
-    return `${heading}<section class="card table-wrap"><table><thead><tr><th>Task</th><th>Owner</th><th>Priority</th><th>Status</th><th>Progress</th><th>Due</th><th>Approval</th><th>Actions</th></tr></thead><tbody>
+    return `${heading}<section class="card table-wrap"><table><thead><tr><th>Task</th><th>Assigned To</th><th>Priority</th><th>Status</th><th>Due</th><th>Approval</th><th>Actions</th></tr></thead><tbody>
       ${rows.map(({ task, depth }) => taskRowMarkup(task, depth)).join('')}
     </tbody></table></section>`;
   }).join('');
@@ -174,7 +173,6 @@ export function boardTaskCardMarkup(task, storyMap) {
     <span class="board-task-card-title">${escapeHtml(task.title)}</span>
     ${story ? `<div class="board-task-card-story">${escapeHtml(story.name)}</div>` : ''}
     ${subtasks.length ? `<div class="small muted">${doneSubtasks} / ${subtasks.length} subtasks</div>` : ''}
-    <div class="progress" style="margin-top:8px"><span style="width:${task.progress}%"></span></div>
     ${task.team_name ? `<div class="small muted">🏷️ ${escapeHtml(task.team_name)}</div>` : ''}
     <div class="board-task-card-meta">${badge(task.priority)}<span class="small muted">${personNameWithStatus(task.owner_id, task.owner_name || 'Unassigned')}</span>${task.due_date ? `<span class="small muted">Due ${escapeHtml(task.due_date)}</span>` : ''}<button type="button" class="icon-action" data-action="quick-assign-task" data-id="${task.id}" aria-label="Assign task" data-tooltip="Assign">${ICONS.userPlus}</button></div>
   </div>`;

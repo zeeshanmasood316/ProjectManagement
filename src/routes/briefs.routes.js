@@ -243,9 +243,9 @@ route('POST', '/api/brief-sessions/:sessionId/commit', async ({ res, user, param
         const taskTeamOverride = resolveTeam(taskItem?.team_name);
         const taskTeam = taskTeamOverride || storyTeam;
         const taskResult = await db.run(
-          `INSERT INTO tasks(project_id,phase,title,description,owner_id,priority,status,progress,acceptance_criteria,due_date,story_id,tags,estimated_hours,source_type,ai_generated,approved,rejected,team_id,ai_team_confidence,ai_team_reason,created_by,created_at,updated_at)
-           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-          [project.id, storyName.slice(0, 120), taskTitle, cleanString(taskItem?.description, 4000), taskOwnerId, ['low', 'medium', 'high', 'critical'].includes(taskItem?.priority) ? taskItem.priority : 'medium', validTaskStatus(taskItem?.status), 0, '', validDate(taskItem?.due_date), storyResult.lastInsertRowid, cleanTags(taskItem?.tags), cleanHours(taskItem?.estimated_hours), 'ai_brief', 1, 0, 0, taskTeam?.id || null, taskTeamOverride ? validTeamConfidence(taskItem?.team_confidence) : null, taskTeamOverride ? cleanString(taskItem?.team_reason, 500) : '', user.id, now, now]
+          `INSERT INTO tasks(project_id,phase,title,description,owner_id,priority,status,acceptance_criteria,due_date,story_id,tags,estimated_hours,source_type,ai_generated,approved,rejected,team_id,ai_team_confidence,ai_team_reason,created_by,created_at,updated_at)
+           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+          [project.id, storyName.slice(0, 120), taskTitle, cleanString(taskItem?.description, 4000), taskOwnerId, ['low', 'medium', 'high', 'critical'].includes(taskItem?.priority) ? taskItem.priority : 'medium', validTaskStatus(taskItem?.status), '', validDate(taskItem?.due_date), storyResult.lastInsertRowid, cleanTags(taskItem?.tags), cleanHours(taskItem?.estimated_hours), 'ai_brief', 1, 0, 0, taskTeam?.id || null, taskTeamOverride ? validTeamConfidence(taskItem?.team_confidence) : null, taskTeamOverride ? cleanString(taskItem?.team_reason, 500) : '', user.id, now, now]
         );
         taskCount += 1;
         recordTeamWork(taskTeam, false);
@@ -257,9 +257,9 @@ route('POST', '/api/brief-sessions/:sessionId/commit', async ({ res, user, param
           const subtaskTeamOverride = resolveTeam(subtaskItem?.team_name);
           const subtaskTeam = subtaskTeamOverride || taskTeam;
           const subtaskResult = await db.run(
-            `INSERT INTO tasks(project_id,phase,title,description,owner_id,priority,status,progress,acceptance_criteria,due_date,story_id,parent_task_id,tags,estimated_hours,source_type,ai_generated,approved,rejected,team_id,ai_team_confidence,ai_team_reason,created_by,created_at,updated_at)
-             VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-            [project.id, storyName.slice(0, 120), subtaskTitle, cleanString(subtaskItem?.description, 4000), subtaskOwnerId, ['low', 'medium', 'high', 'critical'].includes(subtaskItem?.priority) ? subtaskItem.priority : 'medium', validTaskStatus(subtaskItem?.status), 0, '', validDate(subtaskItem?.due_date), storyResult.lastInsertRowid, taskResult.lastInsertRowid, cleanTags(subtaskItem?.tags), cleanHours(subtaskItem?.estimated_hours), 'ai_brief', 1, 0, 0, subtaskTeam?.id || null, subtaskTeamOverride ? validTeamConfidence(subtaskItem?.team_confidence) : null, subtaskTeamOverride ? cleanString(subtaskItem?.team_reason, 500) : '', user.id, now, now]
+            `INSERT INTO tasks(project_id,phase,title,description,owner_id,priority,status,acceptance_criteria,due_date,story_id,parent_task_id,tags,estimated_hours,source_type,ai_generated,approved,rejected,team_id,ai_team_confidence,ai_team_reason,created_by,created_at,updated_at)
+             VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+            [project.id, storyName.slice(0, 120), subtaskTitle, cleanString(subtaskItem?.description, 4000), subtaskOwnerId, ['low', 'medium', 'high', 'critical'].includes(subtaskItem?.priority) ? subtaskItem.priority : 'medium', validTaskStatus(subtaskItem?.status), '', validDate(subtaskItem?.due_date), storyResult.lastInsertRowid, taskResult.lastInsertRowid, cleanTags(subtaskItem?.tags), cleanHours(subtaskItem?.estimated_hours), 'ai_brief', 1, 0, 0, subtaskTeam?.id || null, subtaskTeamOverride ? validTeamConfidence(subtaskItem?.team_confidence) : null, subtaskTeamOverride ? cleanString(subtaskItem?.team_reason, 500) : '', user.id, now, now]
           );
           subtaskCount += 1;
           recordTeamWork(subtaskTeam, true);
@@ -582,9 +582,9 @@ route('POST', '/api/suggestions/:suggestionId/approve', async ({ res, user, para
       [project.organization_id, payload.owner_name]
     ) : null;
     const result = await db.run(
-      `INSERT INTO tasks(project_id,phase,title,description,owner_id,priority,status,progress,acceptance_criteria,source_type,ai_generated,approved,rejected,created_by,created_at,updated_at)
-       VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-      [suggestion.project_id, payload.phase || 'Meeting Follow-up', payload.title || 'Meeting follow-up', payload.description || '', owner?.id || null, ['low','medium','high','critical'].includes(payload.priority) ? payload.priority : 'medium', 'not_started', 0, payload.acceptance_criteria || '', 'meeting_note', 1, 1, 0, user.id, db.utcnow(), db.utcnow()]
+      `INSERT INTO tasks(project_id,phase,title,description,owner_id,priority,status,acceptance_criteria,source_type,ai_generated,approved,rejected,created_by,created_at,updated_at)
+       VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      [suggestion.project_id, payload.phase || 'Meeting Follow-up', payload.title || 'Meeting follow-up', payload.description || '', owner?.id || null, ['low','medium','high','critical'].includes(payload.priority) ? payload.priority : 'medium', 'not_started', payload.acceptance_criteria || '', 'meeting_note', 1, 1, 0, user.id, db.utcnow(), db.utcnow()]
     );
     createdEntity = { type: 'task', id: result.lastInsertRowid };
   } else if (suggestion.suggestion_type === 'decision') {

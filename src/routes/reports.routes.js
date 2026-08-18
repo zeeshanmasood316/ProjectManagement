@@ -66,7 +66,7 @@ route('GET', '/api/projects/:projectId/tasks.csv', async ({ res, user, params })
     [projectId]
   );
   const tasks = scopeTaskList(scope, allTasksForCsv);
-  const headers = ['id','phase','title','owner_name','priority','status','progress','approved','due_date','acceptance_criteria'];
+  const headers = ['id','phase','title','owner_name','priority','status','approved','due_date','acceptance_criteria'];
   const csv = [headers.join(','), ...tasks.map(task => headers.map(header => csvCell(task[header])).join(','))].join('\n');
   textResponse(res, 200, csv, 'text/csv; charset=utf-8', { 'Content-Disposition': `attachment; filename="project-${projectId}-tasks.csv"` });
 });
