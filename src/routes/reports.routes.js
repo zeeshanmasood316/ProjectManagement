@@ -35,7 +35,7 @@ route('GET', '/api/projects/:projectId/export.json', async ({ res, user, params 
   const { scope } = await projectWithAccess(user.id, projectId);
   requireManagerTierOrAbove(scope, 'Exporting a project is only available to managers and above');
   const allTasksForExport = await db.all(
-    `SELECT t.*, s.team_id story_team_id FROM tasks t LEFT JOIN stories s ON s.id=t.story_id WHERE t.project_id=?`,
+    `SELECT t.*, s.team_id story_team_id, parent.team_id parent_team_id FROM tasks t LEFT JOIN stories s ON s.id=t.story_id LEFT JOIN tasks parent ON parent.id=t.parent_task_id WHERE t.project_id=?`,
     [projectId]
   );
   const exportData = {
@@ -62,7 +62,7 @@ route('GET', '/api/projects/:projectId/tasks.csv', async ({ res, user, params })
   const { scope } = await projectWithAccess(user.id, projectId);
   requireManagerTierOrAbove(scope, 'Exporting tasks is only available to managers and above');
   const allTasksForCsv = await db.all(
-    `SELECT t.*,u.full_name owner_name,s.team_id story_team_id FROM tasks t LEFT JOIN users u ON u.id=t.owner_id LEFT JOIN stories s ON s.id=t.story_id WHERE t.project_id=? ORDER BY t.id`,
+    `SELECT t.*,u.full_name owner_name,s.team_id story_team_id,parent.team_id parent_team_id FROM tasks t LEFT JOIN users u ON u.id=t.owner_id LEFT JOIN stories s ON s.id=t.story_id LEFT JOIN tasks parent ON parent.id=t.parent_task_id WHERE t.project_id=? ORDER BY t.id`,
     [projectId]
   );
   const tasks = scopeTaskList(scope, allTasksForCsv);

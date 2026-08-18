@@ -8,10 +8,17 @@ const { activity, audit, notifyUser } = require('../notifications/events');
 
 // ADMIN/PROJECT MANAGER (ceo/admin/moderator) can always assign. A TEAM MANAGER (the lead of the
 // task's own team) may only assign within their own team. A plain WORKER can never assign work.
+// A subtask with no team_id of its own (e.g. created without an explicit team) falls back to its
+// parent task's team, so the manager of that team isn't locked out of their own team's subtasks.
 async function canAssignTask(task, member, targetOwnerId) {
   if (isFullAccessRole(member.role)) return true;
-  if (!task.team_id) return false;
-  const team = await db.get('SELECT * FROM teams WHERE id=?', [task.team_id]);
+  let teamId = task.team_id;
+  if (!teamId && task.parent_task_id) {
+    const parent = await db.get('SELECT team_id FROM tasks WHERE id=?', [task.parent_task_id]);
+    teamId = parent?.team_id || null;
+  }
+  if (!teamId) return false;
+  const team = await db.get('SELECT * FROM teams WHERE id=?', [teamId]);
   if (!team) return false;
   const isLead = Number(team.lead_user_id) === Number(member.user_id);
   // A department manager also manages every team under their department, not only teams they
@@ -21,7 +28,7 @@ async function canAssignTask(task, member, targetOwnerId) {
     : false;
   if (!isLead && !isDepartmentManager) return false;
   if (!targetOwnerId) return true;
-  return Boolean(await db.get('SELECT id FROM team_members WHERE team_id=? AND user_id=?', [task.team_id, targetOwnerId]));
+  return Boolean(await db.get('SELECT id FROM team_members WHERE team_id=? AND user_id=?', [teamId, targetOwnerId]));
 }
 
 async function recordTaskAssignment(project, taskId, actorUserId, previousOwnerId, newOwnerId) {

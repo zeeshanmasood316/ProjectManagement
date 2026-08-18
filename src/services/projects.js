@@ -19,9 +19,9 @@ async function getProject(projectId) {
 
 async function taskDetail(taskId) {
   const task = await db.get(
-    `SELECT t.*,u.full_name owner_name,u.username owner_username,tm.name team_name,lead.id team_manager_id,lead.full_name team_manager_name,s.team_id story_team_id
+    `SELECT t.*,u.full_name owner_name,u.username owner_username,tm.name team_name,lead.id team_manager_id,lead.full_name team_manager_name,s.team_id story_team_id,parent.team_id parent_team_id
      FROM tasks t LEFT JOIN users u ON u.id=t.owner_id LEFT JOIN teams tm ON tm.id=t.team_id LEFT JOIN users lead ON lead.id=tm.lead_user_id
-     LEFT JOIN stories s ON s.id=t.story_id
+     LEFT JOIN stories s ON s.id=t.story_id LEFT JOIN tasks parent ON parent.id=t.parent_task_id
      WHERE t.id=?`,
     [taskId]
   );

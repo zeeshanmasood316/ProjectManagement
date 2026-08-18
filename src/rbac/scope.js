@@ -151,17 +151,23 @@ async function scopeProjectList(scope, projects) {
   return projects.filter(project => allowedIds.has(Number(project.id)));
 }
 
+// A task's own team_id, its parent story's team_id, or (for a subtask with neither) its parent
+// task's team_id — a subtask created without an explicit team assignment still belongs to
+// whichever team the manager of its parent task already manages.
+function effectiveTeamIds(task) {
+  return [task.team_id, task.story_team_id, task.parent_team_id].filter(id => id !== null && id !== undefined).map(Number);
+}
+
 // Fine-grained, within-a-project filter: a Manager only sees tasks/subtasks whose own team_id
-// (or parent story's team_id) is one they manage, or that are assigned to them personally; a
-// Worker only sees tasks/subtasks assigned to them, plus (read-only context) the parent task of
-// any subtask they own, so "what am I working on" still makes sense.
+// (or parent story's/parent task's team_id) is one they manage, or that are assigned to them
+// personally; a Worker only sees tasks/subtasks assigned to them, plus (read-only context) the
+// parent task of any subtask they own, so "what am I working on" still makes sense.
 function scopeTaskList(scope, tasks) {
   if (scope.fullAccess) return tasks;
   if (isManagerScope(scope)) {
     const teamIds = new Set(scope.managedTeamIds);
     return tasks.filter(task =>
-      (task.team_id !== null && task.team_id !== undefined && teamIds.has(Number(task.team_id))) ||
-      (task.story_team_id !== null && task.story_team_id !== undefined && teamIds.has(Number(task.story_team_id))) ||
+      effectiveTeamIds(task).some(id => teamIds.has(id)) ||
       Number(task.owner_id) === scope.userId
     );
   }
@@ -191,8 +197,7 @@ function taskInScope(scope, task) {
   if (Number(task.owner_id) === scope.userId) return true;
   if (isManagerScope(scope)) {
     const teamIds = new Set(scope.managedTeamIds);
-    if (task.team_id !== null && task.team_id !== undefined && teamIds.has(Number(task.team_id))) return true;
-    if (task.story_team_id !== null && task.story_team_id !== undefined && teamIds.has(Number(task.story_team_id))) return true;
+    if (effectiveTeamIds(task).some(id => teamIds.has(id))) return true;
   }
   return false;
 }
@@ -201,8 +206,7 @@ function taskManagedByScope(scope, task) {
   if (scope.fullAccess) return true;
   if (!isManagerScope(scope)) return false;
   const teamIds = new Set(scope.managedTeamIds);
-  const effectiveTeamIds = [task.team_id, task.story_team_id].filter(id => id !== null && id !== undefined).map(Number);
-  return effectiveTeamIds.some(id => teamIds.has(id));
+  return effectiveTeamIds(task).some(id => teamIds.has(id));
 }
 
 // Manager-tier-and-above feature gate for pages the spec puts fully off-limits to plain Workers

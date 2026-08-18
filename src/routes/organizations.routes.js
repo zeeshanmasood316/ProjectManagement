@@ -112,9 +112,10 @@ route('GET', '/api/organizations/:organizationId/dashboard', async ({ res, user,
   // function of `allTasks`, so scoping the source data alone makes the whole dashboard role-correct
   // without touching any of that existing aggregation logic (CEO/admin/moderator: unchanged).
   const orgTasks = await db.all(
-    `SELECT t.*,p.name project_name,u.full_name owner_name,s.name story_name,s.team_id story_team_id,tm.name team_name,lead.full_name team_manager_name
+    `SELECT t.*,p.name project_name,u.full_name owner_name,s.name story_name,s.team_id story_team_id,tm.name team_name,lead.full_name team_manager_name,parent.team_id parent_team_id
      FROM tasks t JOIN projects p ON p.id=t.project_id LEFT JOIN users u ON u.id=t.owner_id
      LEFT JOIN stories s ON s.id=t.story_id LEFT JOIN teams tm ON tm.id=t.team_id LEFT JOIN users lead ON lead.id=tm.lead_user_id
+     LEFT JOIN tasks parent ON parent.id=t.parent_task_id
      WHERE p.organization_id=? AND t.rejected=0`,
     [organizationId]
   );

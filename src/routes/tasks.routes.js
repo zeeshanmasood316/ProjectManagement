@@ -17,9 +17,9 @@ route('GET', '/api/projects/:projectId/tasks', async ({ res, user, params }) => 
   const projectId = integer(params.projectId, 'project id');
   const { scope } = await projectWithAccess(user.id, projectId);
   const allTasks = await db.all(
-    `SELECT t.*,u.full_name owner_name,u.username owner_username,tm.name team_name,lead.full_name team_manager_name,s.team_id story_team_id
+    `SELECT t.*,u.full_name owner_name,u.username owner_username,tm.name team_name,lead.full_name team_manager_name,s.team_id story_team_id,parent.team_id parent_team_id
      FROM tasks t LEFT JOIN users u ON u.id=t.owner_id LEFT JOIN teams tm ON tm.id=t.team_id LEFT JOIN users lead ON lead.id=tm.lead_user_id
-     LEFT JOIN stories s ON s.id=t.story_id
+     LEFT JOIN stories s ON s.id=t.story_id LEFT JOIN tasks parent ON parent.id=t.parent_task_id
      WHERE t.project_id=? AND t.rejected=0 ORDER BY t.phase,t.id`,
     [projectId]
   );
@@ -319,7 +319,7 @@ route('POST', '/api/tasks/:taskId/assign-with-subtasks', async ({ res, user, par
   const assignedSubtaskIds = [];
   if (body.include_unassigned_subtasks) {
     // Only fills subtasks that have no assignee yet — an existing subtask assignment is never overwritten.
-    const subtasks = await db.all('SELECT id,owner_id,team_id FROM tasks WHERE parent_task_id=? AND owner_id IS NULL AND rejected=0', [taskId]);
+    const subtasks = await db.all('SELECT id,owner_id,team_id,parent_task_id FROM tasks WHERE parent_task_id=? AND owner_id IS NULL AND rejected=0', [taskId]);
     for (const subtask of subtasks) {
       if (!await canAssignTask(subtask, member, ownerId)) continue;
       await db.run('UPDATE tasks SET owner_id=?,updated_at=? WHERE id=?', [ownerId, db.utcnow(), subtask.id]);

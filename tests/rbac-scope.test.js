@@ -239,3 +239,72 @@ test('RBAC: a department manager sees their department\'s team work even without
   const deptMgrTeamMembers = await request(`/api/teams/${team.data.id}/members`, { token: deptManager.token });
   assert.equal(deptMgrTeamMembers.status, 200);
 });
+
+test('RBAC: date-editing is manager-tier-and-above only, and a Manager can manage a team-less subtask of their own team\'s task', async () => {
+  const ceo = await register('rbac_dates_ceo');
+  const manager = await register('rbac_dates_mgr');
+  const worker = await register('rbac_dates_wkr');
+  const worker2 = await register('rbac_dates_wkr2');
+
+  const org = await request('/api/organizations', { method: 'POST', token: ceo.token, body: { name: 'Dates RBAC Co' } });
+  assert.equal(org.status, 201);
+  const organizationId = org.data.id;
+
+  await inviteAndApprove(organizationId, ceo.token, manager);
+  await inviteAndApprove(organizationId, ceo.token, worker);
+  await inviteAndApprove(organizationId, ceo.token, worker2);
+
+  const team = await request(`/api/organizations/${organizationId}/teams`, {
+    method: 'POST', token: ceo.token, body: { name: 'Dates Team', lead_user_id: manager.user.id }
+  });
+  assert.equal(team.status, 201);
+  await request(`/api/teams/${team.data.id}/members`, { method: 'POST', token: ceo.token, body: { user_id: worker.user.id } });
+  await request(`/api/teams/${team.data.id}/members`, { method: 'POST', token: ceo.token, body: { user_id: worker2.user.id } });
+
+  const project = await request('/api/projects', { method: 'POST', token: ceo.token, body: { organization_id: organizationId, name: 'Dates Project' } });
+  assert.equal(project.status, 201);
+
+  const milestone = await request(`/api/projects/${project.data.id}/milestones`, { method: 'POST', token: ceo.token, body: { name: 'Launch' } });
+  assert.equal(milestone.status, 201);
+
+  const task = await request(`/api/projects/${project.data.id}/tasks`, {
+    method: 'POST', token: ceo.token, body: { title: 'Team task', team_id: team.data.id, owner_id: worker.user.id }
+  });
+  assert.equal(task.status, 201);
+
+  // Subtask created with NO team_id of its own — only reachable through its parent task's team.
+  const subtask = await request(`/api/projects/${project.data.id}/tasks`, {
+    method: 'POST', token: ceo.token, body: { title: 'Team-less subtask', parent_task_id: task.data.id, owner_id: worker.user.id }
+  });
+  assert.equal(subtask.status, 201);
+  assert.equal(subtask.data.team_id, null, 'the subtask must have no team_id of its own for this to be a meaningful test');
+
+  // --- Item 23: Members cannot edit dates anywhere; Managers can, within their own scope -----
+  const wkrTaskDate = await request(`/api/tasks/${task.data.id}`, { method: 'PATCH', token: worker.token, body: { due_date: '2030-01-01' } });
+  assert.equal(wkrTaskDate.status, 403, 'Worker must not be able to set a due date on their own task');
+
+  const wkrMilestoneDate = await request(`/api/milestones/${milestone.data.id}`, { method: 'PATCH', token: worker.token, body: { due_date: '2030-01-01' } });
+  assert.equal(wkrMilestoneDate.status, 403, 'Worker must not be able to edit milestone dates');
+
+  const wkrProjectDate = await request(`/api/projects/${project.data.id}`, { method: 'PATCH', token: worker.token, body: { due_date: '2030-01-01' } });
+  assert.equal(wkrProjectDate.status, 403, 'Worker must not be able to edit project dates');
+
+  const mgrTaskDate = await request(`/api/tasks/${task.data.id}`, { method: 'PATCH', token: manager.token, body: { due_date: '2030-01-01' } });
+  assert.equal(mgrTaskDate.status, 200, 'Manager can set a due date on their own team\'s task');
+
+  // --- Item 24: Manager can manage a team-less subtask via its parent task's team -----------
+  const mgrSubtaskEdit = await request(`/api/tasks/${subtask.data.id}`, { method: 'PATCH', token: manager.token, body: { due_date: '2030-01-01' } });
+  assert.equal(mgrSubtaskEdit.status, 200, 'Manager should be able to edit a team-less subtask of a task belonging to their own team');
+
+  // Worker still owns the subtask at this point — the same WORKER_SELF_EDIT_FIELDS mechanism
+  // that applies to a normal task must also apply to a team-less subtask.
+  const wkrSubtaskStatus = await request(`/api/tasks/${subtask.data.id}`, { method: 'PATCH', token: worker.token, body: { status: 'in_progress' } });
+  assert.equal(wkrSubtaskStatus.status, 200, 'Worker should still be able to update the status of their own team-less subtask');
+
+  const mgrSubtaskReassign = await request(`/api/tasks/${subtask.data.id}`, { method: 'PATCH', token: manager.token, body: { owner_id: worker2.user.id } });
+  assert.equal(mgrSubtaskReassign.status, 200, 'Manager should be able to reassign a team-less subtask of their own team\'s task');
+
+  // Once reassigned away, the former owner loses even status-only access.
+  const wkrSubtaskStatusAfter = await request(`/api/tasks/${subtask.data.id}`, { method: 'PATCH', token: worker.token, body: { status: 'blocked' } });
+  assert.equal(wkrSubtaskStatusAfter.status, 403, 'Worker must lose access once reassigned away from them');
+});
