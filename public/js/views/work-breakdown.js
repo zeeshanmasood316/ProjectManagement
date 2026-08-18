@@ -65,6 +65,7 @@ export function renderStoryList() {
         <button class="icon-action text-link" type="button" data-action="open-story" data-id="${story.id}" aria-label="Edit story" data-tooltip="Edit story">${ICONS.pencil}</button>
       </div>
       <div class="small muted">${story.department_name ? `${escapeHtml(story.department_name)} · ` : ''}${personNameWithStatus(story.owner_id, story.owner_name || 'Unassigned')}${story.due_date ? ` · Due ${escapeHtml(story.due_date)}` : ''}</div>
+      ${story.team_name ? `<div class="small muted">🏷️ ${escapeHtml(story.team_name)}</div>` : ''}
       <div class="progress" style="margin-top:8px"><span style="width:${percent}%"></span></div>
       <div class="small muted" style="margin-top:4px">${done}/${total} tasks done</div>
     </div>`;
@@ -247,7 +248,10 @@ export function renderTaskTimeline() {
       const left = ((start - minTime) / span) * 100;
       const width = Math.max(((end - start) / span) * 100, 1.5);
       const dependencyNames = (task.dependencies || []).map(id => state.tasks.find(item => Number(item.id) === id)?.title).filter(Boolean);
-      return `<div class="timeline-row"><div class="timeline-row-label">${escapeHtml(task.title)}${dependencyNames.length ? ` <span class="small muted" title="Blocked by: ${escapeHtml(dependencyNames.join(', '))}">(blocked by ${dependencyNames.length})</span>` : ''}</div><div class="timeline-track"><div class="timeline-bar status-${escapeHtml(task.status)}" style="left:${left}%;width:${width}%" data-action="open-task" data-id="${task.id}" role="button" tabindex="0" aria-label="${escapeHtml(task.title)}"><span>${task.progress}%</span></div></div></div>`;
+      const dateRange = task.start_date && task.due_date ? `${task.start_date} → ${task.due_date}` : (task.due_date ? `Due ${task.due_date}` : `Starts ${task.start_date}`);
+      const assignee = task.owner_name || 'Unassigned';
+      const statusLabel = task.status.replaceAll('_', ' ');
+      return `<div class="timeline-row"><div class="timeline-row-label"><div>${escapeHtml(task.title)}${dependencyNames.length ? ` <span class="small muted" title="Blocked by: ${escapeHtml(dependencyNames.join(', '))}">(blocked by ${dependencyNames.length})</span>` : ''}</div><div class="small muted">${personNameWithStatus(task.owner_id, assignee)}</div></div><div class="timeline-track"><div class="timeline-bar status-${escapeHtml(task.status)}" style="left:${left}%;width:${width}%" data-action="open-task" data-id="${task.id}" role="button" tabindex="0" aria-label="${escapeHtml(task.title)}, assigned to ${escapeHtml(assignee)}, ${escapeHtml(statusLabel)}, ${escapeHtml(dateRange)}" title="${escapeHtml(dateRange)}"></div></div></div>`;
     }).join('')}`;
   }).join('');
   const milestoneMarkers = state.milestones.filter(item => item.due_date).map(item => {

@@ -1,5 +1,5 @@
 import { state } from '../state.js';
-import { escapeHtml, badge, ICONS } from '../format.js';
+import { escapeHtml, badge, ICONS, canManage } from '../format.js';
 import { mountDialog, closeDialog, setButtonBusy, toast } from '../ui.js';
 import { api } from '../api.js';
 import { loadProjectData } from '../workspace-loader.js';
@@ -104,7 +104,6 @@ export async function openTaskDialog(taskId = null, presetColumnId = null) {
     ${task?.team_name ? `<div class="small muted full">Manager: ${escapeHtml(task.team_manager_name || 'Not assigned')}</div>` : ''}
     <label>Priority<select name="priority">${['low', 'medium', 'high', 'critical'].map(value => `<option value="${value}" ${task?.priority === value ? 'selected' : ''}>${value}</option>`).join('')}</select></label>
     <label>Status<select name="status" ${presetColumn ? 'disabled' : ''}>${['not_started', 'in_progress', 'blocked', 'done'].map(value => `<option value="${value}" ${(task?.status || presetColumn?.maps_to_status) === value ? 'selected' : ''}>${value.replaceAll('_', ' ')}</option>`).join('')}</select>${presetColumn ? `<small class="field-help">Set by the “${escapeHtml(presetColumn.name)}” column.</small>` : ''}</label>
-    <label>Progress<input name="progress" type="number" min="0" max="100" value="${task?.progress || 0}"></label>
     <label>Start date<input name="start_date" type="date" value="${escapeHtml(task?.start_date || '')}"></label>
     <label>Due date<input name="due_date" type="date" value="${escapeHtml(task?.due_date || '')}"></label>
     <label>Story<select name="story_id">${storyOptions}</select></label>
@@ -199,6 +198,10 @@ export function openStoryDialog(storyId = null) {
   const story = state.stories.find(item => Number(item.id) === Number(storyId));
   const ownerOptions = `<option value="">Unassigned</option>${state.members.filter(member => member.status === 'active').map(member => `<option value="${member.user_id}" ${Number(story?.owner_id) === Number(member.user_id) ? 'selected' : ''}>${escapeHtml(member.full_name)}</option>`).join('')}`;
   const departmentOptions = `<option value="">None</option>${(state.departments || []).map(department => `<option value="${department.id}" ${Number(story?.department_id) === Number(department.id) ? 'selected' : ''}>${escapeHtml(department.name)}</option>`).join('')}`;
+  const teamOptions = `<option value="">Unassigned</option>${(state.teams || []).map(team => `<option value="${team.id}" ${Number(story?.team_id) === Number(team.id) ? 'selected' : ''}>${escapeHtml(team.name)}</option>`).join('')}`;
+  const teamField = canManage()
+    ? `<label>Team<select name="team_id">${teamOptions}</select></label>`
+    : `<label>Team<input value="${escapeHtml(story?.team_name || 'Unassigned')}" disabled></label>`;
   const overlay = document.createElement('div');
   overlay.id = 'storyDialog';
   overlay.className = 'dialog-backdrop';
@@ -207,6 +210,7 @@ export function openStoryDialog(storyId = null) {
     <label class="full">Description<textarea name="description">${escapeHtml(story?.description || '')}</textarea></label>
     <label>Assigned To<select name="owner_id">${ownerOptions}</select></label>
     <label>Department<select name="department_id">${departmentOptions}</select></label>
+    ${teamField}
     <label>Priority<select name="priority">${['low', 'medium', 'high', 'critical'].map(value => `<option value="${value}" ${(story?.priority || 'medium') === value ? 'selected' : ''}>${value}</option>`).join('')}</select></label>
     <label>Status<select name="status">${['not_started', 'in_progress', 'at_risk', 'done'].map(value => `<option value="${value}" ${story?.status === value ? 'selected' : ''}>${value.replaceAll('_', ' ')}</option>`).join('')}</select></label>
     <label>Start date<input name="start_date" type="date" value="${escapeHtml(story?.start_date || '')}"></label>
@@ -220,6 +224,7 @@ export function openStoryDialog(storyId = null) {
     const submitter = event.submitter;
     setButtonBusy(submitter, true);
     const payload = { name: form.get('name'), description: form.get('description'), owner_id: form.get('owner_id') || null, department_id: form.get('department_id') || null, priority: form.get('priority'), status: form.get('status') || 'not_started', start_date: form.get('start_date') || null, due_date: form.get('due_date') || null };
+    if (canManage()) payload.team_id = form.get('team_id') || null;
     try {
       if (story) await api(`/api/stories/${story.id}`, { method: 'PATCH', body: JSON.stringify(payload) });
       else await api(`/api/projects/${state.projectId}/stories`, { method: 'POST', body: JSON.stringify(payload) });

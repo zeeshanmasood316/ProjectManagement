@@ -483,7 +483,7 @@ document.body.addEventListener('submit', async event => {
   const payload = {
     phase: form.get('phase'), title: form.get('title'), description: form.get('description'),
     owner_id: form.get('owner_id') ? Number(form.get('owner_id')) : null,
-    priority: form.get('priority'), status: form.get('status') || 'not_started', progress: Number(form.get('progress') || 0),
+    priority: form.get('priority'), status: form.get('status') || 'not_started',
     acceptance_criteria: form.get('acceptance_criteria'), due_date: form.get('due_date') || null,
     start_date: form.get('start_date') || null,
     milestone_id: form.get('milestone_id') ? Number(form.get('milestone_id')) : null,
