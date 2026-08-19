@@ -1,4 +1,4 @@
-# FlowMate — AI Project Management Assistant
+# VibeManagement — AI Project Management Assistant
 
 **Version 2.8.0 — Full Persistent Workspace + AI Everywhere**
 
@@ -181,7 +181,7 @@ SMTP_FROM=your-email@gmail.com
 PASSWORD_RESET_CODE_TTL_MINUTES=15
 ```
 
-When `NODE_ENV=production`, Orbit refuses to start if `TOKEN_SECRET` is missing or shorter than 32 characters. Set `SECURE_COOKIES=true` only when the public application is served over HTTPS. Set `TRUST_PROXY=true` only behind a trusted reverse proxy.
+When `NODE_ENV=production`, VibeManagement refuses to start if `TOKEN_SECRET` is missing or shorter than 32 characters. Set `SECURE_COOKIES=true` only when the public application is served over HTTPS. Set `TRUST_PROXY=true` only behind a trusted reverse proxy.
 
 If `GEMINI_API_KEY` (or `AI_PROVIDER_API_KEY`) is missing, the server starts normally and prints a console warning, then silently serves the local rule-based fallback for every AI feature (Generate AI Plan, Client Brief analysis, meeting notes, risk scans, etc.) instead of a real model response. After editing `.env`, stop and restart the server (`npm run dev` / `npm start`) — changes to `.env` are only read at process startup.
 
