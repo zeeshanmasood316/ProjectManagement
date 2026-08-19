@@ -308,3 +308,40 @@ test('RBAC: date-editing is manager-tier-and-above only, and a Manager can manag
   const wkrSubtaskStatusAfter = await request(`/api/tasks/${subtask.data.id}`, { method: 'PATCH', token: worker.token, body: { status: 'blocked' } });
   assert.equal(wkrSubtaskStatusAfter.status, 403, 'Worker must lose access once reassigned away from them');
 });
+
+test('RBAC: a Manager can see and add a brand-new org member to their team (regression for the add-member bug)', async () => {
+  const ceo = await register('rbac_addmgr_ceo');
+  const manager = await register('rbac_addmgr_mgr');
+  const recruit = await register('rbac_addmgr_recruit');
+
+  const org = await request('/api/organizations', { method: 'POST', token: ceo.token, body: { name: 'Add-Member RBAC Co' } });
+  assert.equal(org.status, 201);
+  const organizationId = org.data.id;
+
+  await inviteAndApprove(organizationId, ceo.token, manager);
+  await inviteAndApprove(organizationId, ceo.token, recruit);
+
+  const team = await request(`/api/organizations/${organizationId}/teams`, {
+    method: 'POST', token: ceo.token, body: { name: 'Add-Member Team', lead_user_id: manager.user.id }
+  });
+  assert.equal(team.status, 201);
+
+  // Before adding: the recruit isn't on this (or any) team yet, so the RBAC-scoped org member
+  // directory would hide them from the manager entirely — eligible_members must not.
+  const beforeWorkspace = await request(`/api/teams/${team.data.id}/workspace`, { token: manager.token });
+  assert.equal(beforeWorkspace.status, 200);
+  const eligibleIds = new Set(beforeWorkspace.data.eligible_members.map(m => Number(m.user_id)));
+  assert.ok(eligibleIds.has(recruit.user.id), 'Manager must see the not-yet-a-teammate recruit as an eligible candidate');
+
+  const scopedMembers = await request(`/api/organizations/${organizationId}/members`, { token: manager.token });
+  const scopedIds = new Set(scopedMembers.data.map(m => Number(m.user_id)));
+  assert.ok(!scopedIds.has(recruit.user.id), 'Sanity check: the general RBAC-scoped directory genuinely does NOT include the recruit yet (confirms this is the right regression test)');
+
+  const addResult = await request(`/api/teams/${team.data.id}/members`, { method: 'POST', token: manager.token, body: { user_id: recruit.user.id } });
+  assert.equal(addResult.status, 201, 'Manager must be able to add the recruit to their own team');
+
+  // Simulates a page refresh: a completely fresh fetch must show the addition persisted.
+  const afterWorkspace = await request(`/api/teams/${team.data.id}/workspace`, { token: manager.token });
+  assert.ok(afterWorkspace.data.members.some(m => Number(m.user_id) === recruit.user.id), 'Addition must persist after a fresh fetch');
+  assert.ok(!afterWorkspace.data.eligible_members.some(m => Number(m.user_id) === recruit.user.id), 'Once added, the recruit should no longer appear as an eligible candidate');
+});

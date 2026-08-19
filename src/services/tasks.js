@@ -33,11 +33,18 @@ async function canAssignTask(task, member, targetOwnerId) {
 
 async function recordTaskAssignment(project, taskId, actorUserId, previousOwnerId, newOwnerId) {
   await audit(project.organization_id, project.id, actorUserId, 'task', taskId, 'assigned', { previous_owner_id: previousOwnerId || null, new_owner_id: newOwnerId || null });
+  const task = (newOwnerId || previousOwnerId) ? await db.get('SELECT title FROM tasks WHERE id=?', [taskId]) : null;
   if (newOwnerId && Number(newOwnerId) !== Number(actorUserId)) {
-    const task = await db.get('SELECT title FROM tasks WHERE id=?', [taskId]);
     const verb = previousOwnerId ? 'reassigned to you' : 'assigned to you';
     await notifyUser(newOwnerId, 'task_assignment', previousOwnerId ? 'Task reassigned to you' : 'New task assigned to you', `"${task?.title || 'A task'}" was ${verb}.`, project.organization_id, `work:${taskId}`);
     await activity(newOwnerId, 'task_assigned', previousOwnerId ? 'Task reassigned to you' : 'New task assigned to you', task?.title || '', project.organization_id);
+  }
+  // The previous assignee should hear that the task moved on, same as the new assignee hears
+  // it landed on them — but only when there was a previous assignee, they're not the one who
+  // just got it back, and they didn't do the reassigning themselves.
+  if (previousOwnerId && Number(previousOwnerId) !== Number(newOwnerId || 0) && Number(previousOwnerId) !== Number(actorUserId)) {
+    await notifyUser(previousOwnerId, 'task_assignment', 'Task reassigned away from you', `"${task?.title || 'A task'}" is no longer assigned to you.`, project.organization_id, `work:${taskId}`);
+    await activity(previousOwnerId, 'task_unassigned', 'Task reassigned away from you', task?.title || '', project.organization_id);
   }
 }
 

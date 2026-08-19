@@ -44,6 +44,25 @@ route('POST', '/api/projects/:projectId/stories', async ({ res, user, params, bo
   jsonResponse(res, 201, await db.get('SELECT * FROM stories WHERE id=?', [result.lastInsertRowid]));
 });
 
+// Links existing project tasks under a story (does not create tasks, does not duplicate them —
+// only reassigns each task's story_id, so its assignment/status/subtasks/everything else is
+// untouched). Same authorization as creating/editing a story.
+route('POST', '/api/stories/:storyId/tasks', async ({ res, user, params, body }) => {
+  const storyId = integer(params.storyId, 'story id');
+  const { story, project } = await storyWithAccess(user.id, storyId, FULL_ACCESS_ROLES);
+  const taskIds = [...new Set((Array.isArray(body.task_ids) ? body.task_ids : []).map(id => integer(id, 'task_ids')))];
+  if (!taskIds.length) throw new HttpError(400, 'task_ids must be a non-empty array');
+  const linkedIds = [];
+  for (const taskId of taskIds) {
+    const task = await db.get('SELECT id FROM tasks WHERE id=? AND project_id=?', [taskId, story.project_id]);
+    if (!task) throw new HttpError(400, `task id ${taskId} must reference a task in the same project as the story`);
+    await db.run('UPDATE tasks SET story_id=?,updated_at=? WHERE id=?', [storyId, db.utcnow(), taskId]);
+    linkedIds.push(taskId);
+  }
+  await audit(project.organization_id, story.project_id, user.id, 'story', storyId, 'tasks_linked', { task_ids: linkedIds });
+  jsonResponse(res, 200, { story_id: storyId, linked_task_ids: linkedIds });
+});
+
 route('PATCH', '/api/stories/:storyId', async ({ res, user, params, body }) => {
   const storyId = integer(params.storyId, 'story id');
   const { story, project } = await storyWithAccess(user.id, storyId, FULL_ACCESS_ROLES);

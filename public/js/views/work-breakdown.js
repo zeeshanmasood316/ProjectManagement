@@ -49,7 +49,12 @@ export function renderProjectOverview() {
   <section class="card stack" style="margin-top:16px">
     <div class="page-head compact-head"><h3>Stories</h3><div class="actions">${canManage() ? '<button class="secondary" type="button" data-action="open-brief-analyzer">✨ Analyze Brief</button>' : ''}${canManage() ? '<button class="secondary" type="button" data-action="open-story">+ Add Story</button>' : ''}</div></div>
     ${renderStoryList()}
-  </section>`;
+  </section>
+  ${canManage() ? `<section class="card stack" style="margin-top:16px">
+    <h3>Danger zone</h3>
+    <p class="small muted">Permanently delete this project and everything that belongs only to it. This cannot be undone.</p>
+    <button class="danger" type="button" data-action="delete-project" style="align-self:flex-start">Delete project</button>
+  </section>` : ''}`;
 }
 
 export function renderStoryList() {

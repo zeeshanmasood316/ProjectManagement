@@ -215,7 +215,7 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .badge.moderator, .badge.pending, .badge.awaiting_approval, .badge.in_progress, .badge.medium, .badge.at_risk, .badge.planned, .badge.on_hold { background: var(--warn-soft); color: var(--warn); border-color: color-mix(in srgb, var(--warn) 30%, transparent); }
 .badge.member, .badge.invited, .badge.not_started { background: var(--page); color: var(--ink); }
 .badge.rejected, .badge.declined, .badge.blocked, .badge.critical, .badge.high, .badge.suspended, .badge.archived { background: var(--danger-soft); color: var(--danger); border-color: color-mix(in srgb, var(--danger) 30%, transparent); }
-.progress { height: 7px; background: var(--page); overflow: hidden; border-radius: 999px; }
+.progress { height: 7px; background: var(--line); overflow: hidden; border-radius: 999px; }
 .progress span { display: block; height: 100%; background: linear-gradient(90deg, var(--brand-dark), var(--brand)); }
 .kv { display: grid; grid-template-columns: 155px 1fr; gap: 9px 16px; }
 .kv > div:nth-child(odd) { font-weight: 750; color: var(--muted); }

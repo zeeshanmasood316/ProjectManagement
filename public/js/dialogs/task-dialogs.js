@@ -2,7 +2,7 @@ import { state } from '../state.js';
 import { escapeHtml, badge, ICONS, canManage } from '../format.js';
 import { mountDialog, closeDialog, setButtonBusy, toast } from '../ui.js';
 import { api } from '../api.js';
-import { loadProjectData } from '../workspace-loader.js';
+import { loadProjectData, loadWorkspace } from '../workspace-loader.js';
 import { render } from '../dispatch.js';
 
 export let taskCommentStream = null;
@@ -194,6 +194,37 @@ export function openProjectEditDialog() {
   });
 }
 
+export function openDeleteProjectDialog() {
+  const project = state.project;
+  const overlay = document.createElement('div');
+  overlay.id = 'deleteProjectDialog';
+  overlay.className = 'dialog-backdrop';
+  overlay.innerHTML = `<form id="deleteProjectForm" class="dialog-card form-grid"><div class="dialog-head full"><h2 id="deleteProjectDialogTitle">Delete project</h2><button type="button" class="icon-button" data-action="close-dialog" aria-label="Close" data-tooltip="Close">${ICONS.x}</button></div>
+    <div class="full notice danger">This permanently deletes <strong>${escapeHtml(project.name)}</strong> and everything that belongs only to it — stories, tasks, subtasks, milestones, risks, decisions, changes, and comments. Members, teams, and departments are not affected. This cannot be undone.</div>
+    <label class="full">Type <strong>${escapeHtml(project.name)}</strong> to confirm<input name="confirm_name" autofocus required autocomplete="off"></label>
+    <div class="full actions"><button class="danger" type="submit">Delete project permanently</button></div>
+  </form>`;
+  mountDialog(overlay, 'deleteProjectDialogTitle');
+  overlay.querySelector('#deleteProjectForm').addEventListener('submit', async event => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const submitter = event.submitter;
+    const confirmName = form.get('confirm_name');
+    if (confirmName !== project.name) { toast('Type the exact project name to confirm.', true); return; }
+    setButtonBusy(submitter, true);
+    try {
+      await api(`/api/projects/${project.id}`, { method: 'DELETE', body: JSON.stringify({ confirm_name: confirmName }) });
+      closeDialog(overlay);
+      state.projectId = null;
+      state.project = null;
+      state.view = 'projects';
+      await loadWorkspace();
+      render();
+      toast('Project deleted.');
+    } catch (error) { toast(error.message, true); } finally { setButtonBusy(submitter, false); }
+  });
+}
+
 export function openStoryDialog(storyId = null) {
   const story = state.stories.find(item => Number(item.id) === Number(storyId));
   const ownerOptions = `<option value="">Unassigned</option>${state.members.filter(member => member.status === 'active').map(member => `<option value="${member.user_id}" ${Number(story?.owner_id) === Number(member.user_id) ? 'selected' : ''}>${escapeHtml(member.full_name)}</option>`).join('')}`;
@@ -202,6 +233,10 @@ export function openStoryDialog(storyId = null) {
   const teamField = canManage()
     ? `<label>Team<select name="team_id">${teamOptions}</select></label>`
     : `<label>Team<input value="${escapeHtml(story?.team_name || 'Unassigned')}" disabled></label>`;
+  // Attaching existing tasks only makes sense when creating a new story — an existing story
+  // already has its own task list visible in the board/list views for that purpose.
+  const linkableTasks = story ? [] : state.tasks.filter(item => !item.story_id && !item.parent_task_id && !item.rejected);
+  const linkTasksField = !story && linkableTasks.length ? `<fieldset class="full"><legend>Attach existing tasks (optional)</legend><div class="dependency-options">${linkableTasks.map(item => `<label class="toggle-row"><input type="checkbox" name="link_task_ids" value="${item.id}"><span>${escapeHtml(item.title)}</span></label>`).join('')}</div></fieldset>` : '';
   const overlay = document.createElement('div');
   overlay.id = 'storyDialog';
   overlay.className = 'dialog-backdrop';
@@ -215,6 +250,7 @@ export function openStoryDialog(storyId = null) {
     <label>Status<select name="status">${['not_started', 'in_progress', 'at_risk', 'done'].map(value => `<option value="${value}" ${story?.status === value ? 'selected' : ''}>${value.replaceAll('_', ' ')}</option>`).join('')}</select></label>
     <label>Start date<input name="start_date" type="date" value="${escapeHtml(story?.start_date || '')}"></label>
     <label>Due date<input name="due_date" type="date" value="${escapeHtml(story?.due_date || '')}"></label>
+    ${linkTasksField}
     <div class="full actions">${story ? `<button type="button" class="icon-action danger" data-action="delete-story" aria-label="Delete story" data-tooltip="Delete story">${ICONS.trash}</button>` : ''}<button class="primary" type="submit">${story ? 'Save changes' : 'Create story'}</button></div>
   </form>`;
   mountDialog(overlay, 'storyDialogTitle');
@@ -226,8 +262,13 @@ export function openStoryDialog(storyId = null) {
     const payload = { name: form.get('name'), description: form.get('description'), owner_id: form.get('owner_id') || null, department_id: form.get('department_id') || null, priority: form.get('priority'), status: form.get('status') || 'not_started', start_date: form.get('start_date') || null, due_date: form.get('due_date') || null };
     if (canManage()) payload.team_id = form.get('team_id') || null;
     try {
-      if (story) await api(`/api/stories/${story.id}`, { method: 'PATCH', body: JSON.stringify(payload) });
-      else await api(`/api/projects/${state.projectId}/stories`, { method: 'POST', body: JSON.stringify(payload) });
+      if (story) {
+        await api(`/api/stories/${story.id}`, { method: 'PATCH', body: JSON.stringify(payload) });
+      } else {
+        const created = await api(`/api/projects/${state.projectId}/stories`, { method: 'POST', body: JSON.stringify(payload) });
+        const linkTaskIds = form.getAll('link_task_ids').map(Number);
+        if (linkTaskIds.length) await api(`/api/stories/${created.id}/tasks`, { method: 'POST', body: JSON.stringify({ task_ids: linkTaskIds }) });
+      }
       closeDialog(overlay);
       await loadProjectData();
       render();

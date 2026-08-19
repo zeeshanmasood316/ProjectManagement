@@ -77,8 +77,10 @@ export function openTeamDialog(teamId = null, defaultDepartmentId = null) {
 }
 
 export function openAddTeamMemberDialog(teamId) {
-  const existingIds = new Set((state.teamWorkspaceData?.members || []).map(person => Number(person.user_id)));
-  const options = state.members.filter(member => member.status === 'active' && !existingIds.has(Number(member.user_id))).map(member => `<option value="${member.user_id}">${escapeHtml(member.full_name)}</option>`).join('');
+  // eligible_members already excludes people currently on this team, and — unlike state.members —
+  // is not narrowed by the People-directory RBAC scope, so a Manager can see genuinely new
+  // candidates instead of only people already on a team they manage.
+  const options = (state.teamWorkspaceData?.eligible_members || []).map(member => `<option value="${member.user_id}">${escapeHtml(member.full_name)}</option>`).join('');
   const overlay = document.createElement('div');
   overlay.id = 'teamMemberDialog';
   overlay.className = 'dialog-backdrop';

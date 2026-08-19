@@ -71,6 +71,41 @@ route('PATCH', '/api/projects/:projectId', async ({ res, user, params, body }) =
   jsonResponse(res, 200, updatedProject);
 });
 
+// Explicit, ordered manual cascade rather than relying solely on the schema's ON DELETE CASCADE
+// declarations — local SQLite has PRAGMA foreign_keys=ON (src/database/client.js) so those would
+// cascade there, but the Turso/libsql connection path never sets that pragma, so a bare
+// `DELETE FROM projects` could silently leave orphaned rows in production. This works correctly
+// regardless of which backend or pragma state is active, and only ever touches rows scoped to
+// this one project — never users, teams, departments, memberships, or channels.
+route('DELETE', '/api/projects/:projectId', async ({ res, user, params, body }) => {
+  const projectId = integer(params.projectId, 'project id');
+  const { project } = await projectWithAccess(user.id, projectId, FULL_ACCESS_ROLES);
+  const confirmName = cleanString(body?.confirm_name, 160);
+  if (confirmName !== project.name) throw new HttpError(400, 'Type the exact project name to confirm deletion');
+  await db.transaction(async () => {
+    await db.run('DELETE FROM dependencies WHERE task_id IN (SELECT id FROM tasks WHERE project_id=?) OR depends_on_task_id IN (SELECT id FROM tasks WHERE project_id=?)', [projectId, projectId]);
+    await db.run('DELETE FROM task_comments WHERE task_id IN (SELECT id FROM tasks WHERE project_id=?)', [projectId]);
+    await db.run('DELETE FROM updates WHERE project_id=?', [projectId]);
+    await db.run('DELETE FROM suggestions WHERE project_id=?', [projectId]);
+    await db.run('DELETE FROM changes WHERE project_id=?', [projectId]);
+    await db.run('DELETE FROM decisions WHERE project_id=?', [projectId]);
+    await db.run('DELETE FROM risks WHERE project_id=?', [projectId]);
+    await db.run('DELETE FROM tasks WHERE project_id=?', [projectId]);
+    await db.run('DELETE FROM stories WHERE project_id=?', [projectId]);
+    await db.run('DELETE FROM milestones WHERE project_id=?', [projectId]);
+    await db.run('DELETE FROM board_columns WHERE project_id=?', [projectId]);
+    await db.run('DELETE FROM source_records WHERE project_id=?', [projectId]);
+    await db.run('DELETE FROM ai_brief_sessions WHERE project_id=?', [projectId]);
+    await db.run('DELETE FROM audit_log WHERE project_id=?', [projectId]);
+    await db.run('DELETE FROM projects WHERE id=?', [projectId]);
+  });
+  // Recorded after the transaction, with project_id left null (the project — and its own audit
+  // history — no longer exists) but the name/id preserved in details so the deletion itself
+  // remains a permanent, organization-level record.
+  await audit(project.organization_id, null, user.id, 'project', projectId, 'deleted', { name: project.name, project_id: projectId });
+  jsonResponse(res, 200, { removed: true });
+});
+
 route('POST', '/api/projects/:projectId/generate-plan', async ({ res, user, params, body }) => {
   const projectId = integer(params.projectId, 'project id');
   await projectWithAccess(user.id, projectId, FULL_ACCESS_ROLES);

@@ -1,5 +1,5 @@
 import { state } from '../state.js';
-import { escapeHtml, badge, ICONS, canManage, roleCanApproveMembers, currentRole } from '../format.js';
+import { escapeHtml, badge, ICONS, canManage, roleCanApproveMembers, currentRole, personNameWithStatus } from '../format.js';
 import { pageHead } from '../dispatch.js';
 import { renderMemberRow } from './members.js';
 
@@ -103,8 +103,11 @@ export function renderTeamDetail(teamId) {
       }).join('') : '<div class="empty small">No members yet.</div>'}
     </section>
   </div>
-  <section class="card table-wrap" style="margin-top:16px"><h3>Team tasks</h3><table><thead><tr><th>Task</th><th>Project</th><th>Status</th><th>Due</th></tr></thead><tbody>
-    ${tasks.slice(0, 50).map(task => `<tr><td>${escapeHtml(task.title)}</td><td>${escapeHtml(task.project_name)}</td><td>${badge(task.status)}</td><td>${escapeHtml(task.due_date || '—')}</td></tr>`).join('') || '<tr><td colspan="4"><div class="empty">No tasks yet.</div></td></tr>'}
+  <section class="card table-wrap" style="margin-top:16px"><h3>Team tasks</h3><table><thead><tr><th>Task</th><th>Project</th><th>Assigned To</th><th>Status</th><th>Due</th>${canEditTeam ? '<th>Actions</th>' : ''}</tr></thead><tbody>
+    ${tasks.slice(0, 50).map(task => {
+      const assignee = members.find(person => Number(person.user_id) === Number(task.owner_id));
+      return `<tr><td>${escapeHtml(task.title)}</td><td>${escapeHtml(task.project_name)}</td><td>${personNameWithStatus(task.owner_id, assignee?.full_name || 'Unassigned')}</td><td>${badge(task.status)}</td><td>${escapeHtml(task.due_date || '—')}</td>${canEditTeam ? `<td><button type="button" class="icon-action" data-action="reassign-team-task" data-id="${task.id}" aria-label="Reassign task" data-tooltip="Reassign">${ICONS.userPlus}</button></td>` : ''}</tr>`;
+    }).join('') || `<tr><td colspan="${canEditTeam ? 6 : 5}"><div class="empty">No tasks yet.</div></td></tr>`}
   </tbody></table></section>`;
 }
 
@@ -165,7 +168,7 @@ export function renderAdmin() {
     <form id="inviteForm" class="card stack"><h3>Invite registered user</h3><div class="notice">Enter the exact username or email. The user accepts first; CEO/admin approval then activates the membership.</div><label>Username or email<input name="identifier" required></label><label>Department<input name="proposed_department" maxlength="80" value="General" required></label><label>Proposed role<select name="proposed_role">${proposedRoles.map(role => `<option value="${role}">${role}</option>`).join('')}</select></label><button class="primary" type="submit">Send invitation</button></form>
     <section class="card"><h3>Join approvals</h3>${awaiting.map(invitation => `<div class="invitation-card"><strong>${escapeHtml(invitation.invited_name)}</strong><p class="small muted">@${escapeHtml(invitation.invited_username)} · ${escapeHtml(invitation.invited_email)}</p><p class="small muted">${escapeHtml(invitation.proposed_department || 'General')} department</p><div>${badge(invitation.proposed_role)} ${badge(invitation.status)}</div>${roleCanApproveMembers(currentRole()) ? `<div class="actions" style="margin-top:10px"><button class="primary" data-action="approve-invite" data-id="${invitation.id}">Approve access</button><button class="danger" data-action="reject-invite" data-id="${invitation.id}">Reject</button></div>` : '<p class="small">CEO or admin approval required.</p>'}</div>`).join('') || '<div class="empty">No accepted invitations await approval.</div>'}</section>
   </div>
-  <section class="card table-wrap" style="margin-top:16px"><h3>Role & department management</h3><table><thead><tr><th>User</th><th>Role</th><th>Department (text)</th><th>Department</th><th>Manager</th><th>Job role</th><th>Presence</th><th>Membership</th><th>Actions</th></tr></thead><tbody>
+  <section class="card table-wrap" style="margin-top:16px"><h3>Role & department management</h3><table><thead><tr><th>User</th><th>Role</th><th>Department note</th><th>Department</th><th>Manager</th><th>Job role</th><th>Presence</th><th>Membership</th><th>Actions</th></tr></thead><tbody>
     ${state.members.map(renderMemberRow).join('')}
   </tbody></table></section>
   <section class="card table-wrap" style="margin-top:16px"><h3>Invitation history</h3><table><thead><tr><th>User</th><th>Role</th><th>Department</th><th>Status</th><th>Invited by</th><th>Actions</th></tr></thead><tbody>${state.invitations.map(invitation => `<tr><td>${escapeHtml(invitation.invited_name)}<br><span class="small muted">@${escapeHtml(invitation.invited_username)}</span></td><td>${badge(invitation.proposed_role)}</td><td>${escapeHtml(invitation.proposed_department || 'General')}</td><td>${badge(invitation.status)}</td><td>${escapeHtml(invitation.invited_by_name)}</td><td>${['invited','awaiting_approval'].includes(invitation.status) ? `<button class="danger" data-action="cancel-invite" data-id="${invitation.id}">Cancel</button>` : '<span class="small muted">Completed</span>'}</td></tr>`).join('') || '<tr><td colspan="6"><div class="empty">No invitations yet.</div></td></tr>'}</tbody></table></section>`;

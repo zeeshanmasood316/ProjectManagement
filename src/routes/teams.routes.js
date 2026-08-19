@@ -9,6 +9,7 @@ const { resolveAccessScope, scopeTeamList } = require('../rbac/scope');
 const { audit } = require('../notifications/events');
 const { teamWithAccess } = require('../services/access');
 const { broadcastToUsers } = require('../realtime/userEvents');
+const { organizationMembers } = require('../services/organizations');
 
 route('GET', '/api/organizations/:organizationId/teams', async ({ res, user, params }) => {
   const organizationId = integer(params.organizationId, 'organization id');
@@ -168,5 +169,14 @@ route('GET', '/api/teams/:teamId/workspace', async ({ res, user, params }) => {
   }
   const needsDistribution = { stories: [...storyGroups.values()] };
 
-  jsonResponse(res, 200, { team, members, workload, tasks, projects, overdue_count: overdueCount, needs_distribution: needsDistribution });
+  // Candidates for "Add member" — deliberately NOT the RBAC-scoped org member directory
+  // (scopeMemberList narrows a Manager's view to people already on a team they manage, which
+  // makes it impossible to ever see someone new to add). Authorization for who may call this
+  // endpoint at all is already handled above via canManageTeam/isMember; anyone who can see this
+  // workspace and is allowed to manage it is entitled to see every active org member not yet on
+  // this specific team as a candidate.
+  const orgMembers = await organizationMembers(team.organization_id, true);
+  const eligibleMembers = orgMembers.filter(person => !memberIds.includes(Number(person.user_id)));
+
+  jsonResponse(res, 200, { team, members, workload, tasks, projects, overdue_count: overdueCount, needs_distribution: needsDistribution, eligible_members: eligibleMembers });
 });

@@ -10,7 +10,7 @@ import { render, updateShell, viewTitles } from './dispatch.js';
 import { switchProject } from './navigation.js';
 import { intakeState, resetIntakeState } from './views/intake.js';
 import { getDashboardCollapseState, setDashboardCollapseState } from './views/dashboard.js';
-import { openTaskDialog, openAssignDialog, openProjectEditDialog, openStoryDialog } from './dialogs/task-dialogs.js';
+import { openTaskDialog, openAssignDialog, openProjectEditDialog, openDeleteProjectDialog, openStoryDialog } from './dialogs/task-dialogs.js';
 import { updateBriefProgress, openBriefAnalyzerDialog } from './ai-brief/analyzer.js';
 import { openBriefReviewDialog } from './ai-brief/review.js';
 import { openDepartmentDialog, openTeamDialog, openAddTeamMemberDialog, openOrganizationDialog } from './dialogs/org-team-dialogs.js';
@@ -317,6 +317,8 @@ mainContent.addEventListener('click', async event => {
       render();
     } else if (action === 'edit-project') {
       openProjectEditDialog();
+    } else if (action === 'delete-project') {
+      openDeleteProjectDialog();
     } else if (action === 'open-story') {
       openStoryDialog(button.dataset.id ? Number(button.dataset.id) : null);
     } else if (action === 'open-brief-analyzer') {
@@ -385,6 +387,21 @@ mainContent.addEventListener('click', async event => {
       state.teamWorkspaceData = await api(`/api/teams/${button.dataset.id}/workspace`);
       render();
       toast('Member removed from team.');
+    } else if (action === 'reassign-team-task') {
+      // The Team Detail "Team tasks" table can list tasks from any project this team touches, not
+      // just the currently-selected one — so unlike the board's quick-assign, the task must come
+      // from state.teamWorkspaceData (this team's own task list), not state.tasks.
+      const targetId = Number(button.dataset.id);
+      const target = state.teamWorkspaceData?.tasks?.find(item => Number(item.id) === targetId);
+      if (target) {
+        const teamId = state.teamWorkspaceData.team.id;
+        await openAssignDialog(target, {
+          onAssigned: async () => {
+            state.teamWorkspaceData = await api(`/api/teams/${teamId}/workspace`);
+            render();
+          }
+        });
+      }
     } else if (action === 'open-milestone') {
       openMilestoneDialog(button.dataset.id ? Number(button.dataset.id) : null);
     } else if (action === 'calendar-prev' || action === 'calendar-next') {
